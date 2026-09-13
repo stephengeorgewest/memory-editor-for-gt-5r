@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#153b32">
+  <title>Memory Editor for Baofeng GT-5R</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+
+    :root {
+      color-scheme: light dark;
+      --ink: light-dark(#17211d, #e6eee4);
+      --forest: light-dark(#153b32, #0d231e);
+      --forest-light: light-dark(#315844, #244c3d);
+      --leaf: light-dark(#4c7858, #9bc49a);
+      --leaf-bright: light-dark(#b6d58e, #c8e899);
+      --accent: light-dark(#c6e17b, #c5e77d);
+      --paper: light-dark(#f8faf4, #1b2822);
+      --canvas: light-dark(#e8eee6, #101914);
+      --panel: light-dark(#e1eadb, #26382d);
+      --panel-soft: light-dark(#edf4e9, #203127);
+      --line: light-dark(#b3c0ae, #405548);
+      --line-soft: light-dark(#dce4d8, #304238);
+      --button: light-dark(#dbe7d1, #2d4939);
+      --muted: light-dark(#607568, #a7b9a8);
+      --cream: light-dark(#f5f3e8, #edf4e8);
+      --rust: light-dark(#8c5b4d, #e09a81);
+      --subtitle: light-dark(#ccdbca, #c0d0c0);
+      --status: light-dark(#d8e2ce, #c6d8c6);
+      --border: light-dark(#acb9a9, #52695a);
+      --focus: light-dark(#c6dcab, #7ea77d);
+      --button-border: light-dark(#5f8065, #6f9977);
+      --button-ink: light-dark(#234731, #e1efe1);
+      --strong: light-dark(#1e5b3c, #b9e1ae);
+      --notice: light-dark(#45774d, #a8d5a5);
+      --shadow: light-dark(#cbd7c8, #0a100d);
+      --heading-ink: light-dark(#4c6652, #c3d7c4);
+      --readonly: light-dark(#78917a, #91ad94);
+      --clear-border: light-dark(#c6d0c0, #536a5a);
+      --clear-hover: light-dark(#f2e3dc, #49302a);
+      --clear-hover-border: light-dark(#b98777, #d0836e);
+      --empty: light-dark(#718275, #9caf9d);
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: 'DM Mono', monospace;
+      font-synthesis: none;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+    }
+
+    .masthead {
+      align-items: end;
+      background: var(--forest);
+      color: var(--cream);
+      display: flex;
+      gap: 2rem;
+      justify-content: space-between;
+      padding: 3.5rem clamp(1.25rem, 6vw, 7rem) 2.75rem;
+    }
+
+    .kicker {
+      color: var(--leaf-bright);
+      font-size: .7rem;
+      letter-spacing: .17em;
+      margin: 0 0 .75rem;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-family: Fraunces, Georgia, serif;
+      letter-spacing: -.04em;
+      line-height: .9;
+      margin: 0;
+    }
+
+    .subtitle {
+      color: var(--subtitle);
+      font-size: .82rem;
+      line-height: 1.6;
+      margin: 1.15rem 0 0;
+      max-width: 32rem;
+    }
+
+    .file-status {
+      align-items: center;
+      color: var(--status);
+      display: flex;
+      font-size: .72rem;
+      gap: .6rem;
+      padding-bottom: .25rem;
+    }
+
+    .dot {
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px var(--forest-light);
+      display: inline-block;
+      height: .5rem;
+      width: .5rem;
+    }
+
+    main {
+      margin: 0 auto;
+      max-width: 1440px;
+      padding: 2rem clamp(1.25rem, 6vw, 7rem) 5rem;
+    }
+
+    .toolbar {
+      align-items: end;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .toolbar>div:first-child {
+      flex-grow: 1;
+    }
+
+    .search {
+      color: var(--muted);
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      font-size: .68rem;
+      gap: .5rem;
+      letter-spacing: .08em;
+      max-width: 32rem;
+      text-transform: uppercase;
+    }
+
+    .search div {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .search input {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      color: var(--ink);
+      font: inherit;
+      letter-spacing: 0;
+      padding: .85rem 1rem;
+      text-transform: none;
+      width: 100%;
+    }
+
+    .search input:focus,
+    input:focus,
+    select:focus {
+      border-color: var(--leaf);
+      outline: 2px solid var(--focus);
+      outline-offset: 1px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .55rem;
+    }
+
+    .button {
+      border: 1px solid var(--button-border);
+      cursor: pointer;
+      font: 500 .72rem 'DM Mono', monospace;
+      padding: .85rem 1rem;
+    }
+
+    .primary {
+      background: var(--forest);
+      color: var(--cream);
+    }
+
+    .secondary {
+      background: var(--button);
+      color: var(--button-ink);
+    }
+
+    .button:hover:not(:disabled) {
+      filter: brightness(1.17);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .button:hover:not(:disabled) {
+        filter: brightness(0.83);
+      }
+    }
+
+    .summary {
+      color: var(--muted);
+      font-size: .74rem;
+      margin-bottom: 0rem;
+    }
+
+    .summary strong {
+      color: var(--strong);
+      font-size: 1rem;
+    }
+
+    #notice {
+      color: var(--notice);
+      margin-left: 1rem;
+    }
+
+    .grid-shell {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 6px 6px 0 var(--shadow);
+      overflow: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 1240px;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line-soft);
+      padding: .7rem .8rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      background: var(--panel);
+      color: var(--heading-ink);
+      font-size: .64rem;
+      font-weight: 500;
+      letter-spacing: .08em;
+      position: sticky;
+      text-transform: uppercase;
+      top: 0;
+      z-index: 1;
+    }
+
+    td {
+      font-size: .76rem;
+    }
+
+    .channel,
+    .action {
+      background: var(--panel-soft);
+      color: var(--leaf);
+      font-weight: 500;
+      position: sticky;
+      z-index: 2;
+    }
+
+    .channel {
+      left: 0;
+    }
+
+    .action {
+      right: 0;
+    }
+
+    th.channel {
+      z-index: 3;
+    }
+
+    td input,
+    td select {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      color: inherit;
+      font: inherit;
+      min-width: 5.2rem;
+      padding: .25rem .15rem;
+      width: 100%;
+    }
+
+    td input[readonly] {
+      color: var(--readonly);
+      cursor: not-allowed;
+    }
+
+    td select {
+      min-width: 5.8rem;
+    }
+
+    .clear {
+      background: transparent;
+      border: 1px solid var(--clear-border);
+      color: var(--rust);
+      cursor: pointer;
+      font: inherit;
+      font-size: .68rem;
+      padding: .35rem .5rem;
+    }
+
+    .clear:hover {
+      background: var(--clear-hover);
+      border-color: var(--clear-hover-border);
+    }
+
+    #read-serial {
+      --progress: 0%;
+      background-image: linear-gradient(to right, var(--leaf-bright) var(--progress), transparent var(--progress));
+      background-repeat: no-repeat;
+      position: relative;
+    }
+
+    #read-serial[disabled] {
+      cursor: progress;
+      color: var(--button-border);
+    }
+
+    #copy-all[disabled] {
+      display: none;
+    }
+
+    .empty {
+      color: var(--empty);
+      padding: 4rem;
+      text-align: center;
+    }
+
+    .table-section {
+      margin-top: 2.5rem;
+    }
+
+    .table-heading {
+      align-items: end;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: .85rem;
+    }
+
+    .table-heading h2 {
+      color: var(--heading-ink);
+      font-family: Fraunces, Georgia, serif;
+      font-size: 1.35rem;
+      margin: 0;
+    }
+
+    .table-heading p {
+      color: var(--muted);
+      font-size: .7rem;
+      margin: .35rem 0 0;
+    }
+
+    .source-shell {
+      box-shadow: 6px 6px 0 var(--shadow);
+    }
+
+    .source-shell td {
+      color: var(--muted);
+    }
+
+    .source-shell .channel,
+    .source-shell .action {
+      color: var(--leaf);
+    }
+
+    @media (max-width: 700px) {
+
+      .masthead,
+      .toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .masthead {
+        padding-top: 2.5rem;
+      }
+
+      .actions {
+        width: 100%;
+      }
+
+      .button {
+        flex: 1;
+        text-align: center;
+      }
+
+      main {
+        padding-top: 1.5rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="masthead">
+    <div>
+      <p class="kicker">A small</p>
+      <h1>Memory editor</h1>
+      <p class="subtitle">for Baofeng GT-5R radio.</p>
+    </div>
+    <button id="theme" class="button secondary" type="button">Theme: auto</button>
+  </header>
+  <main>
+    <section class="table-section">
+      <div class="table-heading">
+        <div>
+          <h2>Main memory</h2>
+          <p id="memory-status" role="status">Editable channels ready for export.</p>
+        </div>
+      </div>
+      <section class="toolbar">
+        <div>
+          <label class="search">
+            <div>Filter channels<section class="summary"><strong id="visible-count">0</strong> visible of <span
+                  id="total-count">0</span> channels</div>
+            <input id="filter" placeholder="name, frequency, comment">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="add" class="button secondary">Add channel</button>
+          <button id="export" class="button primary">Export CSV</button>
+          <button id="write-serial" class="button primary" disabled>Write to GT-5R</button>
+        </div>
+      </section>
+      <section class="grid-shell">
+        <table>
+          <thead>
+            <tr>
+              <th class="channel">#</th>
+              <th>Name</th>
+              <th>RX frequency</th>
+              <th>Duplex</th>
+              <th>Offset</th>
+              <th>Tone mode</th>
+              <th>TX tone</th>
+              <th>RX tone</th>
+              <th>DTCS</th>
+              <th>Polarity</th>
+              <th>RX DTCS</th>
+              <th>Cross mode</th>
+              <th>Mode</th>
+              <th>Step</th>
+              <th>Skip</th>
+              <th>Power</th>
+              <th>Comment</th>
+              <th class="action"></th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </section>
+    </section>
+
+    <section class="table-section">
+      <div class="table-heading">
+        <div>
+          <h2>Imported CSV</h2>
+          <p id="source-status">Import a CSV to preview read-only channels here.</p>
+        </div>
+        <div class="actions">
+          <label class="button secondary">Import CSV<input id="import" type="file" accept=".csv,text/csv"
+              hidden></label>
+          <button id="read-serial" class="button secondary" type="button">Read from GT-5R</button>
+        </div>
+      </div>
+      <section class="grid-shell source-shell">
+        <table>
+          <thead>
+            <tr>
+              <th class="channel">#</th>
+              <th>Name</th>
+              <th>RX frequency</th>
+              <th>Duplex</th>
+              <th>Offset</th>
+              <th>Tone mode</th>
+              <th>TX tone</th>
+              <th>RX tone</th>
+              <th>DTCS</th>
+              <th>Polarity</th>
+              <th>RX DTCS</th>
+              <th>Cross mode</th>
+              <th>Mode</th>
+              <th>Step</th>
+              <th>Skip</th>
+              <th>Power</th>
+              <th>Comment</th>
+              <th class="action"><button id="copy-all" class="button clear" type="button" disabled>Copy all</button>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="source-body">
+            <tr>
+              <td class="empty" colspan="18">No CSV imported.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <section id="log"></section>
+  </main>
+  <script>
+    const headers = ['Location', 'Name', 'Frequency', 'Duplex', 'Offset', 'Tone', 'rToneFreq', 'cToneFreq', 'DtcsCode', 'DtcsPolarity', 'RxDtcsCode', 'CrossMode', 'Mode', 'TStep', 'Skip', 'Power', 'Comment'];
+
+    const choices = { Duplex: ['', '+', '-', 'split', 'off'], Tone: ['', 'Tone', 'TSQL', 'DTCS', 'DTCS-R', 'Cross'], DtcsPolarity: ['NN', 'NR', 'RN', 'RR'], CrossMode: ['Tone->Tone', 'Tone->DTCS', 'DTCS->Tone', 'DTCS->DTCS'], Mode: ['FM', 'NFM', 'AM', 'WFM', 'USB', 'LSB', 'DV'], Skip: ['', 'S'] };
+    
+    const makeMemory = (values) => Object.assign({ Location: '', Name: '', Frequency: '', Duplex: '', Offset: '', Tone: '', rToneFreq: '', cToneFreq: '', DtcsCode: '', DtcsPolarity: 'NN', RxDtcsCode: '', CrossMode: 'Tone->Tone', Mode: 'FM', TStep: '', Skip: '', Power: '', Comment: '' }, values || {});
+   
+    let memories = [
+      makeMemory({ Location: '1', Name: 'Local repeater', Frequency: '146.520000', Duplex: '+', Offset: '0.600000', Tone: 'Tone', rToneFreq: '100.0', TStep: '5.0', Power: 'High' }),
+      makeMemory({ Location: '2', Name: 'Simplex', Frequency: '146.550000', Mode: 'FM', TStep: '5.0', Power: 'Low' })
+    ];
+
+    let sourceMemories = [];
+    let filter = '';
+    let fileName = 'chirp-export.csv';
+    let theme = localStorage.getItem('chirp-theme') || 'auto';
+
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
+    const csvValue = (value) => /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+    const visibleMemories = () => { const query = filter.trim().toLowerCase(); return memories.filter((memory) => !query || Object.values(memory).join(' ').toLowerCase().includes(query)); };
+
+    function parseCsv(text) {
+      const rows = []; let row = [], cell = '', quoted = false;
+      for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        if (character === '"' && text[index + 1] === '"' && quoted) { cell += '"'; index += 1; }
+        else if (character === '"') quoted = !quoted;
+        else if (character === ',' && !quoted) { row.push(cell); cell = ''; }
+        else if ((character === '\n' || character === '\r') && !quoted) { if (character === '\r' && text[index + 1] === '\n') index += 1; row.push(cell); if (row.some(Boolean)) rows.push(row); row = []; cell = ''; }
+        else cell += character;
+      }
+      if (cell || row.length) { row.push(cell); rows.push(row); }
+      const headerRow = rows.findIndex((candidate) => candidate.includes('Location'));
+      if (headerRow < 0) throw new Error('This file does not contain a CHIRP CSV header.');
+      const sourceHeaders = rows[headerRow];
+      return rows.slice(headerRow + 1).map((values) => makeMemory(Object.fromEntries(headers.map((header) => { const sourceIndex = sourceHeaders.indexOf(header); return [header, sourceIndex >= 0 ? values[sourceIndex] || '' : '']; })))).filter((memory) => memory.Frequency || memory.Name);
+    }
+
+    function editorFor(header, memory) {
+      const value = escapeHtml(memory[header]);
+      if (choices[header]) return `<select data-field="${header}">${choices[header].map((choice) => `<option value="${escapeHtml(choice)}" ${choice === memory[header] ? 'selected' : ''}>${escapeHtml(choice) || 'none'}</option>`).join('')}</select>`;
+      return `<input data-field="${header}" type="${header === 'Location' ? 'number' : 'text'}" value="${value}" ${header === 'Location' ? 'readonly' : ''}>`;
+    }
+
+    function render() {
+      const rows = visibleMemories();
+      document.querySelector('#visible-count').textContent = rows.length;
+      document.querySelector('#total-count').textContent = memories.length;
+      document.querySelector('#table-body').innerHTML = rows.length ? rows.map((memory) => `<tr data-location="${escapeHtml(memory.Location)}"><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${editorFor(header, memory)}</td>`).join('')}<td class="action"><button class="clear" data-action="clear" title="Clear channel">Clear</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No channels match this filter.</td></tr>';
+      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="clear" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
+      document.querySelector('#copy-all').disabled = sourceMemories.length === 0;
+      document.querySelectorAll('[data-field]').forEach((control) => control.addEventListener('change', updateMemory));
+      document.querySelectorAll('[data-action="clear"]').forEach((button) => button.addEventListener('click', clearChannel));
+      document.querySelectorAll('[data-action="copy"]').forEach((button) => button.addEventListener('click', copySource));
+    }
+
+    function bindEvents() {
+      document.querySelector('#filter').addEventListener('input', (event) => { filter = event.target.value; render(); const input = document.querySelector('#filter'); input.focus(); input.setSelectionRange(filter.length, filter.length); });
+      document.querySelector('#import').addEventListener('change', importCsv);
+      document.querySelector('#add').addEventListener('click', addChannel);
+      document.querySelector('#copy-all').addEventListener('click', copyAllSources);
+      document.querySelector('#theme').addEventListener('click', cycleTheme);
+      document.querySelector('#export').addEventListener('click', downloadCsv);
+      const readSerialButton = document.querySelector('#read-serial');
+      if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
+      else readSerialButton.addEventListener('click', readFromGt5r);
+    }
+
+  function findMemory(row) {
+    return memories.find((memory) => memory.Location === row.dataset.location);
+  }
+
+  function updateMemory(event) {
+    const control = event.target;
+    const memory = findMemory(control.closest('tr'));
+    if (memory) {
+      memory[control.dataset.field] = control.value;
+      showStatus('Channel updated'); }
+  }
+
+  function addChannel() {
+    const number = String(Math.max(0, ...memories.map((memory) => Number(memory.Location) || 0)) + 1);
+    memories.push(makeMemory({ Location: number, Frequency: '146.520000', Name: 'New channel' }));
+    render();
+    showStatus('Channel added');
+  }
+
+  function copyMemory(memory) {
+    const copy = makeMemory({ ...memory });
+    const existing = memories.findIndex((item) => item.Location === copy.Location);
+    if (existing >= 0) memories[existing] = copy;
+    else memories.push(copy);
+  }
+
+  function copySource(event) {
+    copyMemory(sourceMemories[Number(event.target.dataset.sourceIndex)]);
+    render();
+    showStatus('Channel copied to main', '#memory');
+  }
+
+  function copyAllSources() {
+    sourceMemories.forEach(copyMemory);
+    render();
+    showStatus(`${sourceMemories.length} channels copied to main`, '#memory');
+  }
+  
+  function clearChannel(event) {
+    const row = event.target.closest('tr');
+    memories = memories.filter((memory) => memory.Location !== row.dataset.location);
+    render();
+    showStatus('Channel cleared', '#memory');
+  }
+
+  function showStatus(message, section = '#memory') {
+    const notice = document.querySelector(section + "-status");
+    notice.textContent = message;
+  }
+  
+  function applyTheme() {
+    document.documentElement.style.colorScheme = theme === 'auto' ? 'light dark' : theme;
+    document.querySelector('#theme').textContent = `Theme: ${theme}`;
+  }
+  
+  function cycleTheme() {
+    theme = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto'; localStorage.setItem('chirp-theme', theme); applyTheme();
+  }
+
+  function downloadCsv() {
+    const content = [
+      headers.join(','),
+      ...memories.map((memory) => headers.map((header) => csvValue(memory[header])).join(','))
+    ].join('\n') + '\n';
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    link.download = fileName; link.click();
+    URL.revokeObjectURL(link.href); 
+    showStatus('CSV exported', '#memory');
+  }
+  
+  function importCsv(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    file.text().then((text) => {
+      sourceMemories = parseCsv(text);
+      document.querySelector('#source-status').textContent = `${sourceMemories.length} read-only channels from ${file.name}`;
+      fileName = file.name.replace(/\.csv$/i, '') + '-edited.csv';
+      render();
+      showStatus(`${sourceMemories.length} channels ready to copy`, '#memory');
+    }).catch((error) => showStatus(error.message, '#memory'));
+  }
+
+
+    // --- GT-5R (Baofeng UV-5R family) serial clone protocol, ported from chirp/drivers/uv5r.py ---
+    const GT5R_IDENTS = [[0x50, 0xBB, 0xFF, 0x20, 0x12, 0x07, 0x25], [0x50, 0xBB, 0xFF, 0x01, 0x25, 0x98, 0x4D]];
+    const GT5R_DTCS = [23, 25, 26, 31, 32, 36, 43, 47, 51, 53, 54, 65, 71, 72, 73, 74, 114, 115, 116, 122, 125, 131, 132, 134, 143, 145, 152, 155, 156, 162, 165, 172, 174, 205, 212, 223, 225, 226, 243, 244, 245, 246, 251, 252, 255, 261, 263, 265, 266, 271, 274, 306, 311, 315, 325, 331, 332, 343, 346, 351, 356, 364, 365, 371, 411, 412, 413, 423, 431, 432, 445, 446, 452, 454, 455, 462, 464, 465, 466, 503, 506, 516, 523, 526, 532, 546, 565, 606, 612, 624, 627, 631, 632, 645, 654, 662, 664, 703, 712, 723, 731, 732, 734, 743, 754];
+    const GT5R_CHANNEL_COUNT = 128;
+    const GT5R_BAUD_RATE = 9600;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    class SerialByteReader {
+      constructor(reader) { this.reader = reader; this.buffer = new Uint8Array(0); }
+      async _fill(timeoutMs) {
+        let timer;
+        const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out waiting for the radio to respond.')), timeoutMs); });
+        let result;
+        try { result = await Promise.race([this.reader.read(), timeout]); } finally { clearTimeout(timer); }
+        if (result.done) throw new Error('Serial connection closed unexpectedly.');
+        if (result.value && result.value.length) { const merged = new Uint8Array(this.buffer.length + result.value.length); merged.set(this.buffer); merged.set(result.value, this.buffer.length); this.buffer = merged; }
+      }
+      async readBytes(count, timeoutMs = 1500) {
+        while (this.buffer.length < count) await this._fill(timeoutMs);
+        const result = this.buffer.slice(0, count);
+        this.buffer = this.buffer.slice(count);
+        return result;
+      }
+    }
+
+    async function gt5rIdent(writer, byteReader, magic) {
+      for (const byte of magic) { await writer.write(new Uint8Array([byte])); await sleep(10); }
+
+      const ack = await byteReader.readBytes(1, 1500);
+      if (ack[0] !== 0x06) throw new Error('Radio did not acknowledge identification (check cable and power-on steps).');
+
+      await writer.write(new Uint8Array([0x02]));
+      const response = [];
+      for (let index = 0; index < 12; index += 1) { const byte = await byteReader.readBytes(1, 1500); response.push(byte[0]); if (byte[0] === 0xDD) break; }
+
+      let ident;
+      if (response.length === 8) ident = response;
+      else if (response.length === 12) ident = [response[0], response[3], response[5], ...response.slice(7)];
+      else throw new Error('Unexpected identification response from radio.');
+
+      await writer.write(new Uint8Array([0x06]));
+      const ack2 = await byteReader.readBytes(1, 1500);
+      if (ack2[0] !== 0x06) throw new Error('Radio refused clone.');
+
+      return new Uint8Array(ident);
+    }
+
+    async function gt5rReadBlock(writer, byteReader, start, size, firstCommand) {
+      await writer.write(new Uint8Array([0x53, (start >> 8) & 0xff, start & 0xff, size]));
+      if (!firstCommand) {
+        const ack = await byteReader.readBytes(1, 2000);
+        if (ack[0] !== 0x06) throw new Error(`Radio refused to send block 0x${start.toString(16)}`);
+      }
+      
+      const header = await byteReader.readBytes(4, 2000);
+      const addr = (header[1] << 8) | header[2];
+      if (header[0] !== 0x58 || addr !== start || header[3] !== size) throw new Error(`Unexpected response for block 0x${start.toString(16)}`);
+
+      const chunk = await byteReader.readBytes(size, 2000);
+      await writer.write(new Uint8Array([0x06]));
+      await sleep(50);
+      return chunk;
+    }
+
+    async function gt5rDownload(port, onProgress) {
+      const writer = port.writable.getWriter();
+      const reader = port.readable.getReader();
+      const byteReader = new SerialByteReader(reader);
+      try {
+        let identBytes = null, lastError = null;
+        for (const magic of GT5R_IDENTS) {
+          try { identBytes = await gt5rIdent(writer, byteReader, magic); break; }
+          catch (error) { lastError = error; await sleep(500); }
+        }
+        if (!identBytes) throw lastError || new Error('Radio did not respond to identification.');
+        
+        const chunks = [identBytes];
+        for (let addr = 0; addr < 0x1800; addr += 0x40) {
+          chunks.push(await gt5rReadBlock(writer, byteReader, addr, 0x40, addr === 0));
+          if (onProgress) onProgress(addr + 0x40, 0x1800);
+        }
+        
+        const data = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+        let offset = 0;
+        for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+        return data;
+      } finally {
+        try { await reader.cancel(); } catch (error) { /* ignore */ }
+        reader.releaseLock();
+        writer.releaseLock();
+      }
+    }
+
+    function gt5rBcdByte(byte) { return ((byte >> 4) & 0xf) * 10 + (byte & 0xf); }
+    function gt5rLbcd4(bytes) { let value = 0; for (let i = 3; i >= 0; i -= 1) value = value * 100 + gt5rBcdByte(bytes[i]); return value; }
+    function gt5rFreq(units) { return (units / 1e6).toFixed(6); }
+
+    function gt5rDecodeChannel(data, index) {
+      const memOffset = 0x0008 + index * 16;
+      const nameOffset = 0x1008 + index * 16;
+      const rec = data.subarray(memOffset, memOffset + 16);
+      if (rec[0] === 0xff) return null;
+
+      const rxRaw = gt5rLbcd4(rec.subarray(0, 4));
+      const txRaw = gt5rLbcd4(rec.subarray(4, 8));
+      const isTxInh = rec[4] === 0xff && rec[5] === 0xff && rec[6] === 0xff && rec[7] === 0xff;
+      const rxtoneVal = rec[8] | (rec[9] << 8);
+      const txtoneVal = rec[10] | (rec[11] << 8);
+      const lowpower = rec[14] & 0x03;
+      const wide = (rec[15] >> 6) & 0x1;
+      const scan = (rec[15] >> 2) & 0x1;
+
+      let duplex = '', offset = 0;
+      if (isTxInh) { duplex = 'off'; offset = 0; }
+      else if (rxRaw === txRaw) { duplex = ''; offset = 0; }
+      else if (Math.abs(rxRaw * 10 - txRaw * 10) > 70000000) { duplex = 'split'; offset = txRaw * 10; }
+      else { duplex = rxRaw > txRaw ? '-' : '+'; offset = Math.abs(rxRaw - txRaw) * 10; }
+
+      const pol = ['N', 'N'];
+      let txmode = '', rtone = null, dtcsCode = null;
+      if (txtoneVal !== 0 && txtoneVal !== 0xffff) {
+        if (txtoneVal >= 0x258) { txmode = 'Tone'; rtone = txtoneVal / 10.0; }
+        else { txmode = 'DTCS'; const idx = txtoneVal >= 0x6a ? (pol[0] = 'R', txtoneVal - 0x6a) : txtoneVal - 1; dtcsCode = GT5R_DTCS[idx]; }
+      }
+      let rxmode = '', ctone = null, rxDtcsCode = null;
+      if (rxtoneVal !== 0 && rxtoneVal !== 0xffff) {
+        if (rxtoneVal >= 0x258) { rxmode = 'Tone'; ctone = rxtoneVal / 10.0; }
+        else { rxmode = 'DTCS'; const idx = rxtoneVal >= 0x6a ? (pol[1] = 'R', rxtoneVal - 0x6a) : rxtoneVal - 1; rxDtcsCode = GT5R_DTCS[idx]; }
+      }
+
+      let tmode = '', crossMode = 'Tone->Tone';
+      if (txmode === 'Tone' && !rxmode) tmode = 'Tone';
+      else if (txmode === rxmode && txmode === 'Tone' && rtone === ctone) tmode = 'TSQL';
+      else if (txmode === rxmode && txmode === 'DTCS' && dtcsCode === rxDtcsCode) tmode = 'DTCS';
+      else if (rxmode || txmode) { tmode = 'Cross'; crossMode = `${txmode}->${rxmode}`; }
+
+      let name = '';
+      for (let i = 0; i < 7; i += 1) { const code = data[nameOffset + i]; name += code === 0xff ? ' ' : String.fromCharCode(code); }
+
+      return makeMemory({
+        Location: String(index + 1),
+        Name: name.trimEnd(),
+        Frequency: gt5rFreq(rxRaw * 10),
+        Duplex: duplex,
+        Offset: gt5rFreq(offset),
+        Tone: tmode,
+        rToneFreq: rtone !== null ? rtone.toFixed(1) : '',
+        cToneFreq: ctone !== null ? ctone.toFixed(1) : '',
+        DtcsCode: dtcsCode !== null ? String(dtcsCode).padStart(3, '0') : '',
+        DtcsPolarity: pol.join(''),
+        RxDtcsCode: rxDtcsCode !== null ? String(rxDtcsCode).padStart(3, '0') : '',
+        CrossMode: crossMode,
+        Mode: wide ? 'FM' : 'NFM',
+        TStep: '',
+        Skip: scan ? '' : 'S',
+        Power: lowpower === 1 ? 'Low' : 'High',
+        Comment: '',
+      });
+    }
+
+    function gt5rParseImage(data) {
+      const channels = [];
+      for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
+      return channels;
+    }
+
+    async function readFromGt5r() {
+      if (!('serial' in navigator)) { showStatus('Web Serial API is not available in this browser.', "#source"); return; }
+      let port;
+      try { port = await navigator.serial.requestPort(); }
+      catch (error) { return; } // user cancelled the port picker
+      const readSerialButton = document.querySelector('#read-serial');
+      try {
+        await port.open({ baudRate: GT5R_BAUD_RATE });
+        showStatus('Reading from GT-5R\u2026', "#source");
+        readSerialButton.disabled = true;
+        readSerialButton.style.setProperty('--progress', '0%');
+        const data = await gt5rDownload(port, (done, total) => {
+          // TODO: can we parse data as we download it?
+          const progress = Math.round((done / total) * 100);
+          showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#source");
+          readSerialButton.style.setProperty('--progress', `${progress}%`);
+        });
+        sourceMemories = gt5rParseImage(data);
+        showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#source");
+        fileName = 'gt5r-read.csv';
+        render();
+        showStatus(`${sourceMemories.length} channels read from GT-5R`, "#source");
+      } catch (error) {
+        showStatus(error.message || 'Failed to read from radio', "#source");
+      } finally {
+        try { await port.close(); } catch (error) { /* already closed */ }
+        readSerialButton.disabled = false;
+        readSerialButton.style.setProperty('--progress', '0%');
+      }
+    }
+
+    bindEvents();
+    applyTheme();
+    render();
+  </script>
+</body>
+
+</html>
