@@ -6,6 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#153b32">
   <title>Memory Editor for Baofeng GT-5R</title>
+  <script>
+    const GT5R_DTCS = [23, 25, 26, 31, 32, 36, 43, 47, 51, 53, 54, 65, 71, 72, 73, 74, 114, 115, 116, 122, 125, 131, 132, 134, 143, 145, 152, 155, 156, 162, 165, 172, 174, 205, 212, 223, 225, 226, 243, 244, 245, 246, 251, 252, 255, 261, 263, 265, 266, 271, 274, 306, 311, 315, 325, 331, 332, 343, 346, 351, 356, 364, 365, 371, 411, 412, 413, 423, 431, 432, 445, 446, 452, 454, 455, 462, 464, 465, 466, 503, 506, 516, 523, 526, 532, 546, 565, 606, 612, 624, 627, 631, 632, 645, 654, 662, 664, 703, 712, 723, 731, 732, 734, 743, 754];
+    const GT5R_CHANNEL_COUNT = 128;
+    const GT5R_BAUD_RATE = 9600;
+
+    // 
+    // Table headers for the memory editor
+    // header[0] is only used in csv import/export
+    const headers = ['Location', 'Name', 'Frequency', 'Duplex', 'Offset', 'Tone', 'rToneFreq', 'cToneFreq', 'DtcsCode', 'DtcsPolarity', 'RxDtcsCode', 'CrossMode', 'Mode', 'TStep', 'Skip', 'Power', 'Comment'];
+
+    // Choices for select fields in the memory editor
+    const choices = { Duplex: ['', '+', '-', 'split', 'off'], Tone: ['', 'Tone', 'TSQL', 'DTCS', 'DTCS-R', 'Cross'], DtcsPolarity: ['NN', 'NR', 'RN', 'RR'], CrossMode: ['Tone->Tone', 'Tone->DTCS', 'DTCS->Tone', 'DTCS->DTCS'], Mode: ['FM', 'NFM', 'AM', 'WFM', 'USB', 'LSB', 'DV'], Skip: ['', 'S'] };
+    
+  </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
 
@@ -38,9 +52,9 @@
       --shadow: light-dark(#cbd7c8, #0a100d);
       --heading-ink: light-dark(#4c6652, #c3d7c4);
       --readonly: light-dark(#78917a, #91ad94);
-      --clear-border: light-dark(#c6d0c0, #536a5a);
-      --clear-hover: light-dark(#f2e3dc, #49302a);
-      --clear-hover-border: light-dark(#b98777, #d0836e);
+      --tertiary-border: light-dark(#c6d0c0, #536a5a);
+      --tertiary-hover: light-dark(#f2e3dc, #49302a);
+      --tertiary-hover-border: light-dark(#b98777, #d0836e);
       --empty: light-dark(#718275, #9caf9d);
       color: var(--ink);
       background: var(--canvas);
@@ -64,7 +78,7 @@
       display: flex;
       gap: 2rem;
       justify-content: space-between;
-      padding: 3.5rem clamp(1.25rem, 6vw, 7rem) 2.75rem;
+      padding: 0.5em;
     }
 
     .kicker {
@@ -110,8 +124,7 @@
 
     main {
       margin: 0 auto;
-      max-width: 1440px;
-      padding: 2rem clamp(1.25rem, 6vw, 7rem) 5rem;
+      padding: 0.5em;
     }
 
     .toolbar {
@@ -170,11 +183,16 @@
       gap: .55rem;
     }
 
-    .button {
+    button, label.button {
       border: 1px solid var(--button-border);
       cursor: pointer;
       font: 500 .72rem 'DM Mono', monospace;
       padding: .85rem 1rem;
+    }
+
+    button[disabled] {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
 
     .primary {
@@ -187,12 +205,25 @@
       color: var(--button-ink);
     }
 
-    .button:hover:not(:disabled) {
+    .tertiary {
+      background: transparent;
+      border-color: var(--tertiary-border);
+      color: var(--rust);
+      font-size: .68rem;
+      padding: .35rem .5rem;
+    }
+
+    .tertiary:hover {
+      background: var(--tertiary-hover);
+      border-color: var(--tertiary-hover-border);
+    }
+
+    button:hover:not(:disabled) {
       filter: brightness(1.17);
     }
 
     @media (prefers-color-scheme: dark) {
-      .button:hover:not(:disabled) {
+      button:hover:not(:disabled) {
         filter: brightness(0.83);
       }
     }
@@ -245,9 +276,33 @@
       top: 0;
       z-index: 1;
     }
-
+    th.action div{
+      position: relative;
+    }
+    th.action div div#copy-options-container{
+      position:absolute;
+      right: 0;
+      display:none;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: .5rem;
+    }
     td {
       font-size: .76rem;
+    }
+
+    tr[data-hidden="true"] {
+      display: none;
+    }
+
+    tr[row-selected] td {
+      background: var(--canvas);
+      font-weight:bolder;
+      color: var(--heading-ink);
+    }
+    tr[row-selected] td:first-child, tr[row-selected] td:last-child {
+      background: var(--paper);
     }
 
     .channel,
@@ -256,7 +311,6 @@
       color: var(--leaf);
       font-weight: 500;
       position: sticky;
-      z-index: 2;
     }
 
     .channel {
@@ -288,23 +342,20 @@
       cursor: not-allowed;
     }
 
+    input[type="checkbox"], label:has(select) {
+      cursor: pointer;
+      accent-color: var(--leaf);
+    }
+
+    label:has(> input[type="checkbox"]) {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      gap: .3rem;
+    }
+
     td select {
       min-width: 5.8rem;
-    }
-
-    .clear {
-      background: transparent;
-      border: 1px solid var(--clear-border);
-      color: var(--rust);
-      cursor: pointer;
-      font: inherit;
-      font-size: .68rem;
-      padding: .35rem .5rem;
-    }
-
-    .clear:hover {
-      background: var(--clear-hover);
-      border-color: var(--clear-hover-border);
     }
 
     #read-serial {
@@ -319,7 +370,8 @@
       color: var(--button-border);
     }
 
-    #copy-all[disabled] {
+    #copy-all[disabled],
+    #copy-selected[disabled] {
       display: none;
     }
 
@@ -366,16 +418,51 @@
       color: var(--leaf);
     }
 
-    @media (max-width: 700px) {
+    select {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      color: var(--ink);
+      font: inherit;
+      padding: .35rem 0.25rem;
+    }
 
-      .masthead,
+    label:has(:focus) {
+      border-color: var(--leaf);
+      outline: 2px solid var(--focus);
+      outline-offset: 1px;
+    }
+
+    .serial-log {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 6px 6px 0 var(--shadow);
+      color: var(--muted);
+      font-size: .75rem;
+      font-family: 'DM Mono', monospace;
+      line-height: 1.5;
+      margin-top: 2.5rem;
+      max-height: 20rem;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .serial-log div {
+      padding:1rem;
+      margin-bottom: -.5rem;
+    }
+
+    .serial-log div:first-child {
+      position:sticky;
+      top: 0;
+      background-color: var(--panel);
+    }
+
+    @media (max-width: 700px) {
       .toolbar {
         align-items: flex-start;
         flex-direction: column;
-      }
-
-      .masthead {
-        padding-top: 2.5rem;
       }
 
       .actions {
@@ -385,10 +472,6 @@
       .button {
         flex: 1;
         text-align: center;
-      }
-
-      main {
-        padding-top: 1.5rem;
       }
     }
   </style>
@@ -401,7 +484,7 @@
       <h1>Memory editor</h1>
       <p class="subtitle">for Baofeng GT-5R radio.</p>
     </div>
-    <button id="theme" class="button secondary" type="button">Theme: auto</button>
+    <button id="theme" class="secondary" type="button">Theme: auto</button>
   </header>
   <main>
     <section class="table-section">
@@ -415,15 +498,15 @@
         <div>
           <label class="search">
             <div>Filter channels<section class="summary"><strong id="visible-count">0</strong> visible of <span
-                  id="total-count">0</span> channels</div>
+                  id="total-count"><script>document.write(GT5R_CHANNEL_COUNT);</script></span> channels</div>
             <input id="filter" placeholder="name, frequency, comment">
           </label>
         </div>
 
         <div class="actions">
-          <button id="add" class="button secondary">Add channel</button>
-          <button id="export" class="button primary">Export CSV</button>
-          <button id="write-serial" class="button primary" disabled>Write to GT-5R</button>
+          <label><input id="hide-empty" class="button secondary" type="checkbox">Hide empty channels</label>
+          <button id="export" class="primary">Export CSV</button>
+          <button id="write-serial" class="primary" disabled>Write to GT-5R</button>
         </div>
       </section>
       <section class="grid-shell">
@@ -431,26 +514,49 @@
           <thead>
             <tr>
               <th class="channel">#</th>
-              <th>Name</th>
-              <th>RX frequency</th>
-              <th>Duplex</th>
-              <th>Offset</th>
-              <th>Tone mode</th>
-              <th>TX tone</th>
-              <th>RX tone</th>
-              <th>DTCS</th>
-              <th>Polarity</th>
-              <th>RX DTCS</th>
-              <th>Cross mode</th>
-              <th>Mode</th>
-              <th>Step</th>
-              <th>Skip</th>
-              <th>Power</th>
-              <th>Comment</th>
+              <script>
+                headers.slice(1).forEach((header) => {
+                  document.write(`<th>${header}</th>`);
+                });
+              </script>
               <th class="action"></th>
             </tr>
           </thead>
-          <tbody id="table-body"></tbody>
+          <tbody id="table-body">
+            <script>
+              const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
+
+              const tbody = document.querySelector('#table-body');
+
+              Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-location', i);
+
+                const channelTD = document.createElement('td');
+                channelTD.className = 'channel';
+                channelTD.textContent = i;
+                row.appendChild(channelTD);
+
+                headers.slice(1).forEach((header) => {
+                  const td = document.createElement('td');
+                  const value = "";//escapeHtml(memory[header]);
+                  td.innerHTML = choices[header]
+                    ? `<select data-field="${header}">${choices[header].map((choice) => `
+                        <option value="${choice}">${escapeHtml(choice) || 'none'}</option>`).join('')}
+                      </select>`
+                    : `<input data-field="${header}" type="text">`;
+                    
+                  row.appendChild(td);
+                });
+                
+                const actionTD = document.createElement('td');
+                actionTD.className = 'action';
+                actionTD.innerHTML = `<button class="tertiary" data-action="clear" title="Clear channel">Clear</button>`;
+                row.appendChild(actionTD);
+                tbody.appendChild(row);
+              })
+            </script>
+          </tbody>
         </table>
       </section>
     </section>
@@ -458,13 +564,13 @@
     <section class="table-section">
       <div class="table-heading">
         <div>
-          <h2>Imported CSV</h2>
-          <p id="source-status">Import a CSV to preview read-only channels here.</p>
+          <h2>Imported</h2>
+          <p id="source-status">Import a CSV, or read from device to preview read-only channels here.</p>
         </div>
         <div class="actions">
           <label class="button secondary">Import CSV<input id="import" type="file" accept=".csv,text/csv"
               hidden></label>
-          <button id="read-serial" class="button secondary" type="button">Read from GT-5R</button>
+          <button id="read-serial" class="secondary" type="button">Read from GT-5R</button>
         </div>
       </div>
       <section class="grid-shell source-shell">
@@ -472,23 +578,30 @@
           <thead>
             <tr>
               <th class="channel">#</th>
-              <th>Name</th>
-              <th>RX frequency</th>
-              <th>Duplex</th>
-              <th>Offset</th>
-              <th>Tone mode</th>
-              <th>TX tone</th>
-              <th>RX tone</th>
-              <th>DTCS</th>
-              <th>Polarity</th>
-              <th>RX DTCS</th>
-              <th>Cross mode</th>
-              <th>Mode</th>
-              <th>Step</th>
-              <th>Skip</th>
-              <th>Power</th>
-              <th>Comment</th>
-              <th class="action"><button id="copy-all" class="button clear" type="button" disabled>Copy all</button>
+              <script>
+                headers.slice(1).forEach(header => {
+                  document.write(`<th>${header}</th>`);
+                });
+              </script>
+              <th class="action"><div>
+                <button id="copy-all" class="tertiary" type="button" disabled>Copy all</button>
+                <button id="copy-selected" class="tertiary" type="button" disabled>Copy selected</button>
+                <button id="copy-options" class="tertiary" title="Copy Options">⌥</button>
+                <div id="copy-options-container">
+                  <label><select id="copy-destination">
+                    <option value="">--</option>
+                    <script>document.addEventListener('DOMContentLoaded', function() {
+                      for(let i=0; i < GT5R_CHANNEL_COUNT; i++) {
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = i;
+                        document.querySelector('#copy-destination').appendChild(option);
+                      }
+                      document.querySelector('#copy-destination').value = ''; 
+                    });</script>
+                  </select> Copy Destination</label>
+                  <label title="Copy selected channels without gaps"><input type="checkbox" id="copy-contiguously" /> Copy contiguously</label>
+                </div></div>
               </th>
             </tr>
           </thead>
@@ -501,26 +614,27 @@
       </section>
     </section>
 
-    <section id="log"></section>
+    <section class="table-section">
+      <div class="table-heading">
+        <div>
+          <h2>Serial Log</h2>
+          <p>Displays the log of serial communication with the device.</p>
+        </div>
+        <div><select id="select-serial-log"></select></div>
+      </div>
+      <div id="serial-logs-container"></div>
+    </section>
   </main>
   <script>
-    const headers = ['Location', 'Name', 'Frequency', 'Duplex', 'Offset', 'Tone', 'rToneFreq', 'cToneFreq', 'DtcsCode', 'DtcsPolarity', 'RxDtcsCode', 'CrossMode', 'Mode', 'TStep', 'Skip', 'Power', 'Comment'];
-
-    const choices = { Duplex: ['', '+', '-', 'split', 'off'], Tone: ['', 'Tone', 'TSQL', 'DTCS', 'DTCS-R', 'Cross'], DtcsPolarity: ['NN', 'NR', 'RN', 'RR'], CrossMode: ['Tone->Tone', 'Tone->DTCS', 'DTCS->Tone', 'DTCS->DTCS'], Mode: ['FM', 'NFM', 'AM', 'WFM', 'USB', 'LSB', 'DV'], Skip: ['', 'S'] };
-    
     const makeMemory = (values) => Object.assign({ Location: '', Name: '', Frequency: '', Duplex: '', Offset: '', Tone: '', rToneFreq: '', cToneFreq: '', DtcsCode: '', DtcsPolarity: 'NN', RxDtcsCode: '', CrossMode: 'Tone->Tone', Mode: 'FM', TStep: '', Skip: '', Power: '', Comment: '' }, values || {});
    
-    let memories = [
-      makeMemory({ Location: '1', Name: 'Local repeater', Frequency: '146.520000', Duplex: '+', Offset: '0.600000', Tone: 'Tone', rToneFreq: '100.0', TStep: '5.0', Power: 'High' }),
-      makeMemory({ Location: '2', Name: 'Simplex', Frequency: '146.550000', Mode: 'FM', TStep: '5.0', Power: 'Low' })
-    ];
+    let memories = [];
 
     let sourceMemories = [];
     let filter = '';
     let fileName = 'chirp-export.csv';
     let theme = localStorage.getItem('chirp-theme') || 'auto';
 
-    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
     const csvValue = (value) => /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
     const visibleMemories = () => { const query = filter.trim().toLowerCase(); return memories.filter((memory) => !query || Object.values(memory).join(' ').toLowerCase().includes(query)); };
 
@@ -541,19 +655,12 @@
       return rows.slice(headerRow + 1).map((values) => makeMemory(Object.fromEntries(headers.map((header) => { const sourceIndex = sourceHeaders.indexOf(header); return [header, sourceIndex >= 0 ? values[sourceIndex] || '' : '']; })))).filter((memory) => memory.Frequency || memory.Name);
     }
 
-    function editorFor(header, memory) {
-      const value = escapeHtml(memory[header]);
-      if (choices[header]) return `<select data-field="${header}">${choices[header].map((choice) => `<option value="${escapeHtml(choice)}" ${choice === memory[header] ? 'selected' : ''}>${escapeHtml(choice) || 'none'}</option>`).join('')}</select>`;
-      return `<input data-field="${header}" type="${header === 'Location' ? 'number' : 'text'}" value="${value}" ${header === 'Location' ? 'readonly' : ''}>`;
-    }
-
     function render() {
       const rows = visibleMemories();
       document.querySelector('#visible-count').textContent = rows.length;
-      document.querySelector('#total-count').textContent = memories.length;
-      document.querySelector('#table-body').innerHTML = rows.length ? rows.map((memory) => `<tr data-location="${escapeHtml(memory.Location)}"><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${editorFor(header, memory)}</td>`).join('')}<td class="action"><button class="clear" data-action="clear" title="Clear channel">Clear</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No channels match this filter.</td></tr>';
-      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="clear" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
+      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${escapeHtml(memory.Location)}"><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
       document.querySelector('#copy-all').disabled = sourceMemories.length === 0;
+      document.querySelectorAll('[imported-location]').forEach((cell) => cell.addEventListener('click', importedLocationClick));
       document.querySelectorAll('[data-field]').forEach((control) => control.addEventListener('change', updateMemory));
       document.querySelectorAll('[data-action="clear"]').forEach((button) => button.addEventListener('click', clearChannel));
       document.querySelectorAll('[data-action="copy"]').forEach((button) => button.addEventListener('click', copySource));
@@ -561,180 +668,352 @@
 
     function bindEvents() {
       document.querySelector('#filter').addEventListener('input', (event) => { filter = event.target.value; render(); const input = document.querySelector('#filter'); input.focus(); input.setSelectionRange(filter.length, filter.length); });
+      document.querySelector('#hide-empty').addEventListener('click', (event) => {
+        document.querySelectorAll("[data-location]").forEach((row) => {
+          if(event.target.checked && row.getAttribute('data-location') === '0') {
+            row.setAttribute('data-hidden', 'true');
+          } else {
+            row.removeAttribute('data-hidden');
+          }
+        });
+      });
       document.querySelector('#import').addEventListener('change', importCsv);
-      document.querySelector('#add').addEventListener('click', addChannel);
       document.querySelector('#copy-all').addEventListener('click', copyAllSources);
+      document.querySelector('#copy-selected').addEventListener('click', copySelectedSources);
+      document.querySelector('#copy-options-container').style.display = 'none';
+      document.querySelector("label:has(#copy-destination)").addEventListener('click', (event) => {
+        /*prevent default prevents
+
+        index.html:653 Uncaught NotAllowedError: Failed to execute 'showPicker' on 'HTMLSelectElement': showPicker() requires a user gesture.
+    at HTMLLabelElement.<anonymous> (index.html:653:53)
+(anonymous) @ index.html:653
+index.html:653 Uncaught NotAllowedError: Failed to execute 'showPicker' on 'HTMLSelectElement': showPicker() requires a user gesture.
+    at HTMLLabelElement.<anonymous> (index.html:653:53)
+(anonymous) @ index.html:653
+
+but also prevents focus;
+
+I guess just let the error happen.*/
+        //event.preventDefault();
+        //this.focus();
+        //document.querySelector("label:has(#copy-destination)")
+        document.getElementById('copy-destination').showPicker();
+      });
+      document.querySelector('#copy-options').addEventListener('click', () => {
+        const container = document.querySelector('#copy-options-container');
+        container.style.display = container.style.display === 'none' ? 'flex' : 'none';
+      });
       document.querySelector('#theme').addEventListener('click', cycleTheme);
       document.querySelector('#export').addEventListener('click', downloadCsv);
       const readSerialButton = document.querySelector('#read-serial');
       if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
       else readSerialButton.addEventListener('click', readFromGt5r);
+      document.querySelector('#select-serial-log').addEventListener('change', (event) => {
+        const index = Number(event.target.value);
+        showSerialLog(index);
+      });
+    }
+    function showSerialLog(index) {
+      const serialLogsContainer = document.querySelector('#serial-logs-container');
+      serialLogsContainer.childNodes.forEach((node, i) => { node.style.display = i === index ? 'block' : 'none'; });
     }
 
-  function findMemory(row) {
-    return memories.find((memory) => memory.Location === row.dataset.location);
-  }
+    function findMemory(row) {
+      return memories.find((memory) => memory.Location === row.dataset.location);
+    }
 
-  function updateMemory(event) {
-    const control = event.target;
-    const memory = findMemory(control.closest('tr'));
-    if (memory) {
-      memory[control.dataset.field] = control.value;
-      showStatus('Channel updated'); }
-  }
+    function updateMemory(event) {
+      const control = event.target;
+      const memory = findMemory(control.closest('tr'));
+      if (memory) {
+        memory[control.dataset.field] = control.value;
+        showStatus('Channel updated'); }
+    }
 
-  function addChannel() {
-    const number = String(Math.max(0, ...memories.map((memory) => Number(memory.Location) || 0)) + 1);
-    memories.push(makeMemory({ Location: number, Frequency: '146.520000', Name: 'New channel' }));
-    render();
-    showStatus('Channel added');
-  }
+    function copyMemory(memory) {
+      const existing = Array.from(document.querySelectorAll('#table-body tr')).find((item) => item.dataset.location === memory.Location);
 
-  function copyMemory(memory) {
-    const copy = makeMemory({ ...memory });
-    const existing = memories.findIndex((item) => item.Location === copy.Location);
-    if (existing >= 0) memories[existing] = copy;
-    else memories.push(copy);
-  }
+      if (existing) {
+        existing.childNodes.forEach((node, i) => {
+          node.childNodes[0].value = memory[headers[i]];
+        });
+      } 
+    }
 
-  function copySource(event) {
-    copyMemory(sourceMemories[Number(event.target.dataset.sourceIndex)]);
-    render();
-    showStatus('Channel copied to main', '#memory');
-  }
+    function copySource(event) {
+      //don't bubble event to the TR select row click event
+      event.stopPropagation();
 
-  function copyAllSources() {
-    sourceMemories.forEach(copyMemory);
-    render();
-    showStatus(`${sourceMemories.length} channels copied to main`, '#memory');
-  }
-  
-  function clearChannel(event) {
-    const row = event.target.closest('tr');
-    memories = memories.filter((memory) => memory.Location !== row.dataset.location);
-    render();
-    showStatus('Channel cleared', '#memory');
-  }
+      const copy = makeMemory({ ...sourceMemories[Number(event.target.dataset.sourceIndex)] });
 
-  function showStatus(message, section = '#memory') {
-    const notice = document.querySelector(section + "-status");
-    notice.textContent = message;
-  }
-  
-  function applyTheme() {
-    document.documentElement.style.colorScheme = theme === 'auto' ? 'light dark' : theme;
-    document.querySelector('#theme').textContent = `Theme: ${theme}`;
-  }
-  
-  function cycleTheme() {
-    theme = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto'; localStorage.setItem('chirp-theme', theme); applyTheme();
-  }
+      const startingAt = document.getElementById('copy-destination').value;
+      if(startingAt) copy.Location = startingAt;
 
-  function downloadCsv() {
-    const content = [
-      headers.join(','),
-      ...memories.map((memory) => headers.map((header) => csvValue(memory[header])).join(','))
-    ].join('\n') + '\n';
+      copyMemory(copy);
+      showStatus('Channel copied to main', '#memory');
+    }
 
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
-    link.download = fileName; link.click();
-    URL.revokeObjectURL(link.href); 
-    showStatus('CSV exported', '#memory');
-  }
-  
-  function importCsv(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    file.text().then((text) => {
-      sourceMemories = parseCsv(text);
-      document.querySelector('#source-status').textContent = `${sourceMemories.length} read-only channels from ${file.name}`;
-      fileName = file.name.replace(/\.csv$/i, '') + '-edited.csv';
-      render();
-      showStatus(`${sourceMemories.length} channels ready to copy`, '#memory');
-    }).catch((error) => showStatus(error.message, '#memory'));
-  }
+    function copyAllSources() {
+      const startingAt = document.getElementById('copy-destination').value;
+
+      // rows are labeled starting from 1
+      // so do that for --, I guess.
+      const startingIndex = startingAt === "" ? 1 : Number(startingAt);
+      sourceMemories.forEach((memory, i) => {
+        const newLocation = startingIndex + i;
+        if(newLocation < GT5R_CHANNEL_COUNT){
+          copyMemory({...makeMemory({ ...memory, Location: String(startingIndex + i) })});
+        } else {
+          console.log(`skipping ${memory.Location} because it exceeds the channel count`);
+        }
+      });
+      showStatus(`${sourceMemories.length} channels copied to main`, '#memory');
+    }
+
+    function copySelectedSources() {
+
+      const selectedRows = [...document.querySelectorAll('[row-selected]')].map(row => row.getAttribute('imported-location'));
+      if(selectedRows.length === 0) return;
+
+      const firstSelected = selectedRows[0];
+      const startingAt = document.getElementById('copy-destination').value || selectedRows[0];
+
+      // rows are labeled starting from 1
+      // so do that for --, I guess.
+      const startingIndex = startingAt === "" ? 1 : Number(startingAt);
+
+      const selectedMemories = sourceMemories.filter((memory) => selectedRows.includes(memory.Location));
+      
+      // if selected range 2,3,4,7,8,9 starting at 0 => then we copy 2to0 3to1 4to2 7to3 8to4 9to5
+      const copyContigious = document.getElementById('copy-contiguously').checked;
+
+      selectedMemories.forEach((memory, i) => {
+        let newLocation = copyContigious 
+          ? startingIndex + i 
+          : startingIndex + Number(memory.Location) - Number(firstSelected);
+
+        if(newLocation < GT5R_CHANNEL_COUNT){
+          copyMemory({...makeMemory({ ...memory, Location: String(newLocation) })});
+        } else {
+          console.log(`skipping ${memory.Location} because it exceeds the channel count`);
+        }
+      });
+      showStatus(`${selectedRows.length} channels copied to main`, '#memory');
+    }
+    
+    function clearChannel(event) {
+      const row = event.target.closest('tr');
+      const fields = row.querySelectorAll('[data-field]');
+      for(const field of fields) {
+        const dataField = field.getAttribute('data-field');
+        field.value = choices[dataField]?.[0] ?? '';
+      }
+      showStatus('Channel cleared', '#memory');
+    }
+
+    function showStatus(message, section = '#memory') {
+      const notice = document.querySelector(section + "-status");
+      notice.textContent = message;
+    }
+    
+    function applyTheme() {
+      document.documentElement.style.colorScheme = theme === 'auto' ? 'light dark' : theme;
+      document.querySelector('#theme').textContent = `Theme: ${theme}`;
+    }
+    
+    function cycleTheme() {
+      theme = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto'; localStorage.setItem('chirp-theme', theme); applyTheme();
+    }
+
+    function downloadCsv() {
+      const content = [
+        headers.join(','),
+        ...memories.map((memory) => headers.map((header) => csvValue(memory[header])).join(','))
+      ].join('\n') + '\n';
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+      link.download = fileName; link.click();
+      URL.revokeObjectURL(link.href); 
+      showStatus('CSV exported', '#memory');
+    }
+    
+    function importCsv(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      file.text().then((text) => {
+        sourceMemories = parseCsv(text);
+        document.querySelector('#source-status').textContent = `${sourceMemories.length} read-only channels from ${file.name}`;
+        fileName = file.name.replace(/\.csv$/i, '') + '-edited.csv';
+        render();
+        showStatus(`${sourceMemories.length} channels ready to copy`, '#memory');
+      }).catch((error) => showStatus(error.message, '#memory'));
+    }
+
+    function importedLocationClick(event) {
+      // td gets the click event for some reason
+      const tr = event.target.parentElement;
+      rowSelected = tr.attributes['row-selected'];
+      if(event.altKey){
+        if(rowSelected !== undefined){
+          tr.removeAttribute('row-selected');
+        } else {
+          const selectedRows = Array.from(document.querySelectorAll('[row-selected]')).map((tr) => parseInt(tr.getAttribute('row-selected')) || 0);
+          const nextRowSelected = Math.max(...selectedRows) + 1;
+          tr.setAttribute('row-selected', nextRowSelected);
+        }
+      } else if(event.shiftKey){
+        const selectedRows = document.querySelectorAll('[row-selected]');
+        const selectedRowsNumbers = Array.from(selectedRows).map((tr) => parseInt(tr.getAttribute('row-selected')) || 0);
+        const currentRowSelectedNumber = selectedRows.length ? Math.max(...selectedRowsNumbers) : 0;
+        tr.setAttribute('row-selected', currentRowSelectedNumber + 1);
+
+        let oldFound = false;
+        let newFound = false;
+        document.querySelectorAll("#source-body tr").forEach((row) => {
+          const selectedNumber = parseInt(row.getAttribute('row-selected'));
+          if(selectedNumber === currentRowSelectedNumber){
+            oldFound = true;
+            return;
+          }
+          if(selectedNumber === currentRowSelectedNumber + 1){
+            newFound = true;
+            return;
+          }
+
+          if(oldFound && newFound) return;
+          
+          if(oldFound || newFound){
+            row.setAttribute('row-selected', currentRowSelectedNumber);
+          }
+        });
+      } else {
+        document.querySelectorAll('[row-selected]').forEach((tr) => tr.removeAttribute('row-selected'));
+        tr.setAttribute('row-selected', '1');
+      }
+
+      if(document.querySelectorAll('[row-selected]').length === 0){
+        document.getElementById('copy-all').disabled = false;
+        document.getElementById('copy-selected').disabled = true;
+      } else {
+        document.getElementById('copy-all').disabled = true;
+        document.getElementById('copy-selected').disabled = false;
+      }
+    }
 
 
     // --- GT-5R (Baofeng UV-5R family) serial clone protocol, ported from chirp/drivers/uv5r.py ---
-    const GT5R_IDENTS = [[0x50, 0xBB, 0xFF, 0x20, 0x12, 0x07, 0x25], [0x50, 0xBB, 0xFF, 0x01, 0x25, 0x98, 0x4D]];
-    const GT5R_DTCS = [23, 25, 26, 31, 32, 36, 43, 47, 51, 53, 54, 65, 71, 72, 73, 74, 114, 115, 116, 122, 125, 131, 132, 134, 143, 145, 152, 155, 156, 162, 165, 172, 174, 205, 212, 223, 225, 226, 243, 244, 245, 246, 251, 252, 255, 261, 263, 265, 266, 271, 274, 306, 311, 315, 325, 331, 332, 343, 346, 351, 356, 364, 365, 371, 411, 412, 413, 423, 431, 432, 445, 446, 452, 454, 455, 462, 464, 465, 466, 503, 506, 516, 523, 526, 532, 546, 565, 606, 612, 624, 627, 631, 632, 645, 654, 662, 664, 703, 712, 723, 731, 732, 734, 743, 754];
-    const GT5R_CHANNEL_COUNT = 128;
-    const GT5R_BAUD_RATE = 9600;
+
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    class SerialByteReader {
-      constructor(reader) { this.reader = reader; this.buffer = new Uint8Array(0); }
-      async _fill(timeoutMs) {
-        let timer;
-        const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out waiting for the radio to respond.')), timeoutMs); });
-        let result;
-        try { result = await Promise.race([this.reader.read(), timeout]); } finally { clearTimeout(timer); }
-        if (result.done) throw new Error('Serial connection closed unexpectedly.');
-        if (result.value && result.value.length) { const merged = new Uint8Array(this.buffer.length + result.value.length); merged.set(this.buffer); merged.set(result.value, this.buffer.length); this.buffer = merged; }
+
+    async function readFromGt5r() {
+      if (!('serial' in navigator)) { showStatus('Web Serial API is not available in this browser.', "#source"); return; }
+      let port;
+      try { port = await navigator.serial.requestPort(); }
+      catch (error) { return; } // user cancelled the port picker
+      const readSerialButton = document.querySelector('#read-serial');
+      try {
+        const byteReader = new SerialByteReaderWriterWithLogger(port);
+        await byteReader.open();
+        showStatus('Reading from GT-5R\u2026', "#source");
+        readSerialButton.disabled = true;
+        readSerialButton.style.setProperty('--progress', '0%');
+
+        const data = await gt5rDownload(byteReader, (done, total) => {
+          // TODO: can we parse data as we download it?
+          const progress = Math.round((done / total) * 100);
+          showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#source");
+          readSerialButton.style.setProperty('--progress', `${progress}%`);
+        });
+        sourceMemories = gt5rParseImage(data);
+        showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#source");
+        fileName = 'gt5r-read.csv';
+        render();
+        showStatus(`${sourceMemories.length} channels read from GT-5R`, "#source");
+      } catch (error) {
+        showStatus(error.message || 'Failed to read from radio', "#source");
+      } finally {
+        try { await port.close(); } catch (error) { /* already closed */ }
+        readSerialButton.disabled = false;
+        readSerialButton.style.setProperty('--progress', '0%');
       }
+    }
+
+    class SerialByteReaderWriterWithLogger {
+      constructor(port) {
+        this.port = port;
+      }
+
+      async open() {
+        await this.port.open({ baudRate: GT5R_BAUD_RATE });
+        this.addSerialLog(`Opened port ${this.port.getInfo().usbVendorId}:${this.port.getInfo().usbProductId} baud:${GT5R_BAUD_RATE} at ${new Date().toISOString()}`);
+        this.writer = this.port.writable.getWriter();
+        this.reader = this.port.readable.getReader();
+        this.buffer = new Uint8Array(0);
+      }
+
       async readBytes(count, timeoutMs = 1500) {
-        while (this.buffer.length < count) await this._fill(timeoutMs);
-        const result = this.buffer.slice(0, count);
+        while (this.buffer.length < count) {
+          let timer;
+          const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Timed out waiting for the radio to respond.')), timeoutMs); });
+          let result;
+          try { result = await Promise.race([this.reader.read(), timeout]); } finally { clearTimeout(timer); }
+          if (result.done) throw new Error('Serial connection closed unexpectedly.');
+          if (result.value && result.value.length) { const merged = new Uint8Array(this.buffer.length + result.value.length); merged.set(this.buffer); merged.set(result.value, this.buffer.length); this.buffer = merged; }
+        }
+        const bytes = this.buffer.slice(0, count);
         this.buffer = this.buffer.slice(count);
-        return result;
+        this.addSerialLogEntry(`Read ${bytes.length} bytes[${Array.from(bytes).map(byte => `0x${byte.toString(16).padStart(2, '0')}`).join(', ')}] at ${new Date().toISOString()}`);
+        return bytes;
+      }
+
+      async writeBytes(bytes) {
+        this.addSerialLogEntry(`Wrote bytes[${bytes.map(byte => `0x${byte.toString(16).padStart(2, '0')}`).join(', ')}] at ${new Date().toISOString()}`);
+        for (const byte of bytes) {
+          await this.writer.write(new Uint8Array([byte]));
+          // chirp had a sleep for the REQUEST_CLONING_MODE_COMMAND
+          // but I think it is not needed.
+          // await sleep(10);
+        }
+      }
+
+      addSerialLog(firstEntry) {
+        const logContainer = document.querySelector('#serial-logs-container');
+        const newLog = document.createElement('div');
+        newLog.classList.add('serial-log');
+        logContainer.appendChild(newLog);
+        this.addSerialLogEntry(firstEntry);
+
+        const logCount = document.querySelectorAll('#serial-logs-container > div').length;
+        const serialLogSelect = document.querySelector('#select-serial-log');
+        serialLogSelect.innerHTML = Array.from({ length: logCount }, (_, i) => `<option value="${i}">${i}</option>`).join('');
+        serialLogSelect.value = logCount - 1;
+        showSerialLog(logCount - 1);
+      }
+      addSerialLogEntry(logEntry){
+        const logsContainer = document.querySelector('#serial-logs-container');
+        const logContainer = logsContainer.lastElementChild;
+        if(!logContainer) return;
+
+        const entryDiv = document.createElement('div');
+        entryDiv.textContent = logEntry;
+        logContainer.appendChild(entryDiv);
+        entryDiv.scrollIntoView();
       }
     }
 
-    async function gt5rIdent(writer, byteReader, magic) {
-      for (const byte of magic) { await writer.write(new Uint8Array([byte])); await sleep(10); }
-
-      const ack = await byteReader.readBytes(1, 1500);
-      if (ack[0] !== 0x06) throw new Error('Radio did not acknowledge identification (check cable and power-on steps).');
-
-      await writer.write(new Uint8Array([0x02]));
-      const response = [];
-      for (let index = 0; index < 12; index += 1) { const byte = await byteReader.readBytes(1, 1500); response.push(byte[0]); if (byte[0] === 0xDD) break; }
-
-      let ident;
-      if (response.length === 8) ident = response;
-      else if (response.length === 12) ident = [response[0], response[3], response[5], ...response.slice(7)];
-      else throw new Error('Unexpected identification response from radio.');
-
-      await writer.write(new Uint8Array([0x06]));
-      const ack2 = await byteReader.readBytes(1, 1500);
-      if (ack2[0] !== 0x06) throw new Error('Radio refused clone.');
-
-      return new Uint8Array(ident);
-    }
-
-    async function gt5rReadBlock(writer, byteReader, start, size, firstCommand) {
-      await writer.write(new Uint8Array([0x53, (start >> 8) & 0xff, start & 0xff, size]));
-      if (!firstCommand) {
-        const ack = await byteReader.readBytes(1, 2000);
-        if (ack[0] !== 0x06) throw new Error(`Radio refused to send block 0x${start.toString(16)}`);
-      }
-      
-      const header = await byteReader.readBytes(4, 2000);
-      const addr = (header[1] << 8) | header[2];
-      if (header[0] !== 0x58 || addr !== start || header[3] !== size) throw new Error(`Unexpected response for block 0x${start.toString(16)}`);
-
-      const chunk = await byteReader.readBytes(size, 2000);
-      await writer.write(new Uint8Array([0x06]));
-      await sleep(50);
-      return chunk;
-    }
-
-    async function gt5rDownload(port, onProgress) {
-      const writer = port.writable.getWriter();
-      const reader = port.readable.getReader();
-      const byteReader = new SerialByteReader(reader);
+    async function gt5rDownload(byteReader, onProgress) {
       try {
         let identBytes = null, lastError = null;
-        for (const magic of GT5R_IDENTS) {
-          try { identBytes = await gt5rIdent(writer, byteReader, magic); break; }
-          catch (error) { lastError = error; await sleep(500); }
-        }
+        try { identBytes = await gt5rIdent(byteReader); }
+        catch (error) { lastError = error; await sleep(500); }
+        
         if (!identBytes) throw lastError || new Error('Radio did not respond to identification.');
         
         const chunks = [identBytes];
         for (let addr = 0; addr < 0x1800; addr += 0x40) {
-          chunks.push(await gt5rReadBlock(writer, byteReader, addr, 0x40, addr === 0));
+          chunks.push(await gt5rReadBlock(byteReader, addr, 0x40, addr === 0));
           if (onProgress) onProgress(addr + 0x40, 0x1800);
         }
         
@@ -743,15 +1022,66 @@
         for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
         return data;
       } finally {
-        try { await reader.cancel(); } catch (error) { /* ignore */ }
-        reader.releaseLock();
-        writer.releaseLock();
+        try { await byteReader.reader.cancel(); } catch (error) { /* ignore */ }
+        byteReader.reader.releaseLock();
+        byteReader.writer.releaseLock();
       }
     }
 
-    function gt5rBcdByte(byte) { return ((byte >> 4) & 0xf) * 10 + (byte & 0xf); }
-    function gt5rLbcd4(bytes) { let value = 0; for (let i = 3; i >= 0; i -= 1) value = value * 100 + gt5rBcdByte(bytes[i]); return value; }
-    function gt5rFreq(units) { return (units / 1e6).toFixed(6); }
+    const RESPONSE_SUCCESS = 0x06;
+    async function gt5rIdent(byteReader) {
+      const REQUEST_CLONING_MODE_COMMAND = [0x50, 0xBB, 0xFF, 0x20, 0x12, 0x07, 0x25];
+      await byteReader.writeBytes(REQUEST_CLONING_MODE_COMMAND); 
+
+      const ack = await byteReader.readBytes(1, 1500);
+      if (ack[0] !== RESPONSE_SUCCESS) throw new Error('Radio did not acknowledge identification (check cable and power-on steps).');
+
+      const REQUEST_STRUCTURE_COMMAND = [0x02];
+      await byteReader.writeBytes(REQUEST_STRUCTURE_COMMAND);
+      const response = [];
+
+      // Reference: https://github.com/kk7ds/chirp/blob/098f57b2563af7d9411f2f42722947c52d569929/chirp/drivers/uv5r.py#L399
+      const RESPONSE_TERMINATOR = 0xDD;
+      for (let index = 0; index < 12; index += 1) {
+        const byte = await byteReader.readBytes(1, 1500);
+        response.push(byte[0]);
+        if (byte[0] === RESPONSE_TERMINATOR) break;
+      }
+
+      let ident;
+      if (response.length === 8) ident = response;
+      else if (response.length === 12) ident = [response[0], response[3], response[5], ...response.slice(7)];
+      else throw new Error('Unexpected identification response from radio.');
+
+      await byteReader.writeBytes([RESPONSE_SUCCESS]);
+      const ack2 = await byteReader.readBytes(1, 1500);
+      if (ack2[0] !== RESPONSE_SUCCESS) throw new Error('Radio refused clone.');
+
+      return new Uint8Array(ident);
+    }
+
+    async function gt5rReadBlock(byteReader, start, size, firstCommand) {
+      await byteReader.writeBytes([0x53, (start >> 8) & 0xff, start & 0xff, size]);
+      if (!firstCommand) {
+        const ack = await byteReader.readBytes(1, 2000);
+        if (ack[0] !== RESPONSE_SUCCESS) throw new Error(`Radio refused to send block 0x${start.toString(16)}`);
+      }
+      
+      const header = await byteReader.readBytes(4, 2000);
+      const addr = (header[1] << 8) | header[2];
+      if (header[0] !== 0x58 || addr !== start || header[3] !== size) throw new Error(`Unexpected response for block 0x${start.toString(16)}`);
+
+      const chunk = await byteReader.readBytes(size, 2000);
+      await byteReader.writeBytes([RESPONSE_SUCCESS]);
+      // await sleep(50);
+      return chunk;
+    }
+
+    function gt5rParseImage(data) {
+      const channels = [];
+      for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
+      return channels;
+    }
 
     function gt5rDecodeChannel(data, index) {
       const memOffset = 0x0008 + index * 16;
@@ -796,7 +1126,7 @@
       for (let i = 0; i < 7; i += 1) { const code = data[nameOffset + i]; name += code === 0xff ? ' ' : String.fromCharCode(code); }
 
       return makeMemory({
-        Location: String(index + 1),
+        Location: index,
         Name: name.trimEnd(),
         Frequency: gt5rFreq(rxRaw * 10),
         Duplex: duplex,
@@ -816,42 +1146,10 @@
       });
     }
 
-    function gt5rParseImage(data) {
-      const channels = [];
-      for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
-      return channels;
-    }
+    function gt5rLbcd4(bytes) { let value = 0; for (let i = 3; i >= 0; i -= 1) value = value * 100 + gt5rBcdByte(bytes[i]); return value; }
+    function gt5rBcdByte(byte) { return ((byte >> 4) & 0xf) * 10 + (byte & 0xf); }
 
-    async function readFromGt5r() {
-      if (!('serial' in navigator)) { showStatus('Web Serial API is not available in this browser.', "#source"); return; }
-      let port;
-      try { port = await navigator.serial.requestPort(); }
-      catch (error) { return; } // user cancelled the port picker
-      const readSerialButton = document.querySelector('#read-serial');
-      try {
-        await port.open({ baudRate: GT5R_BAUD_RATE });
-        showStatus('Reading from GT-5R\u2026', "#source");
-        readSerialButton.disabled = true;
-        readSerialButton.style.setProperty('--progress', '0%');
-        const data = await gt5rDownload(port, (done, total) => {
-          // TODO: can we parse data as we download it?
-          const progress = Math.round((done / total) * 100);
-          showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#source");
-          readSerialButton.style.setProperty('--progress', `${progress}%`);
-        });
-        sourceMemories = gt5rParseImage(data);
-        showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#source");
-        fileName = 'gt5r-read.csv';
-        render();
-        showStatus(`${sourceMemories.length} channels read from GT-5R`, "#source");
-      } catch (error) {
-        showStatus(error.message || 'Failed to read from radio', "#source");
-      } finally {
-        try { await port.close(); } catch (error) { /* already closed */ }
-        readSerialButton.disabled = false;
-        readSerialButton.style.setProperty('--progress', '0%');
-      }
-    }
+    function gt5rFreq(units) { return (units / 1e6).toFixed(6); }
 
     bindEvents();
     applyTheme();
