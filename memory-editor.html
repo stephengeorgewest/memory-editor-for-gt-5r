@@ -292,7 +292,7 @@
       font-size: .76rem;
     }
 
-    tr[data-hidden="true"] {
+    tr.hidden {
       display: none;
     }
 
@@ -314,10 +314,12 @@
     }
 
     .channel {
+      width: 4em;
       left: 0;
     }
 
     .action {
+      width: 16em;
       right: 0;
     }
 
@@ -501,10 +503,10 @@
                   id="total-count"><script>document.write(GT5R_CHANNEL_COUNT);</script></span> channels</div>
             <input id="filter" placeholder="name, frequency, comment">
           </label>
+          <label><input id="hide-empty" class="button secondary" type="checkbox">Hide empty channels</label>
         </div>
 
         <div class="actions">
-          <label><input id="hide-empty" class="button secondary" type="checkbox">Hide empty channels</label>
           <button id="export" class="primary">Export CSV</button>
           <button id="write-serial" class="primary" disabled>Write to GT-5R</button>
         </div>
@@ -631,12 +633,34 @@
     let memories = [];
 
     let sourceMemories = [];
-    let filter = '';
     let fileName = 'chirp-export.csv';
     let theme = localStorage.getItem('chirp-theme') || 'auto';
 
     const csvValue = (value) => /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
-    const visibleMemories = () => { const query = filter.trim().toLowerCase(); return memories.filter((memory) => !query || Object.values(memory).join(' ').toLowerCase().includes(query)); };
+    const visibleMemories = () => {
+      const hideEmpty = document.getElementById('hide-empty').checked;
+      const query = document.getElementById('filter').value.trim().toLowerCase();
+      let visible = 0;
+      document.querySelectorAll('[data-location]').forEach((row) => {
+        const isMatchingChannel = !query || row.dataset.location.toLowerCase().includes(query);
+
+        const dataFields = row.querySelectorAll("[data-field]");
+        const allEmptyFields = hideEmpty && Array.from(dataFields).every((field) => {
+          const defaultValue = choices[field.dataset.field]?.[0] ?? '';
+          return field.value === defaultValue;
+        });
+        const hasMatchingField = !query || Array.from(dataFields).some((field) => {
+          return field.value.toLowerCase().includes(query);
+        });
+        if ((isMatchingChannel || hasMatchingField) && !allEmptyFields) {
+          row.classList.remove('hidden');
+          visible += 1;
+        } else {
+          row.classList.add('hidden');
+        }
+      });
+      document.querySelector('#visible-count').textContent = visible;
+    };
 
     function parseCsv(text) {
       const rows = []; let row = [], cell = '', quoted = false;
@@ -656,8 +680,6 @@
     }
 
     function render() {
-      const rows = visibleMemories();
-      document.querySelector('#visible-count').textContent = rows.length;
       document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${escapeHtml(memory.Location)}"><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
       document.querySelector('#copy-all').disabled = sourceMemories.length === 0;
       document.querySelectorAll('[imported-location]').forEach((cell) => cell.addEventListener('click', importedLocationClick));
@@ -667,16 +689,8 @@
     }
 
     function bindEvents() {
-      document.querySelector('#filter').addEventListener('input', (event) => { filter = event.target.value; render(); const input = document.querySelector('#filter'); input.focus(); input.setSelectionRange(filter.length, filter.length); });
-      document.querySelector('#hide-empty').addEventListener('click', (event) => {
-        document.querySelectorAll("[data-location]").forEach((row) => {
-          if(event.target.checked && row.getAttribute('data-location') === '0') {
-            row.setAttribute('data-hidden', 'true');
-          } else {
-            row.removeAttribute('data-hidden');
-          }
-        });
-      });
+      document.querySelector('#filter').addEventListener('input', visibleMemories);
+      document.querySelector('#hide-empty').addEventListener('change', visibleMemories);
       document.querySelector('#import').addEventListener('change', importCsv);
       document.querySelector('#copy-all').addEventListener('click', copyAllSources);
       document.querySelector('#copy-selected').addEventListener('click', copySelectedSources);
@@ -718,13 +732,15 @@ I guess just let the error happen.*/
       serialLogsContainer.childNodes.forEach((node, i) => { node.style.display = i === index ? 'block' : 'none'; });
     }
 
-    function findMemory(row) {
-      return memories.find((memory) => memory.Location === row.dataset.location);
+    //todo store memory in byte array for display/export
+    function findMemory(location) {
+      return memories.find((memory) => memory.Location === location);
     }
 
     function updateMemory(event) {
       const control = event.target;
-      const memory = findMemory(control.closest('tr'));
+      const row = control.closest('tr');
+      const memory = findMemory(row.dataset.location);
       if (memory) {
         memory[control.dataset.field] = control.value;
         showStatus('Channel updated'); }
@@ -750,6 +766,7 @@ I guess just let the error happen.*/
       if(startingAt) copy.Location = startingAt;
 
       copyMemory(copy);
+      visibleMemories();
       showStatus('Channel copied to main', '#memory');
     }
 
@@ -767,6 +784,7 @@ I guess just let the error happen.*/
           console.log(`skipping ${memory.Location} because it exceeds the channel count`);
         }
       });
+      visibleMemories();
       showStatus(`${sourceMemories.length} channels copied to main`, '#memory');
     }
 
@@ -798,6 +816,7 @@ I guess just let the error happen.*/
           console.log(`skipping ${memory.Location} because it exceeds the channel count`);
         }
       });
+      visibleMemories();
       showStatus(`${selectedRows.length} channels copied to main`, '#memory');
     }
     
@@ -805,10 +824,12 @@ I guess just let the error happen.*/
       const row = event.target.closest('tr');
       const fields = row.querySelectorAll('[data-field]');
       for(const field of fields) {
-        const dataField = field.getAttribute('data-field');
+        const dataField = field.dataset.field;
         field.value = choices[dataField]?.[0] ?? '';
       }
       showStatus('Channel cleared', '#memory');
+
+      visibleMemories();
     }
 
     function showStatus(message, section = '#memory') {
@@ -929,7 +950,6 @@ I guess just let the error happen.*/
         sourceMemories = gt5rParseImage(data);
         showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#source");
         fileName = 'gt5r-read.csv';
-        render();
         showStatus(`${sourceMemories.length} channels read from GT-5R`, "#source");
       } catch (error) {
         showStatus(error.message || 'Failed to read from radio', "#source");
@@ -1153,7 +1173,6 @@ I guess just let the error happen.*/
 
     bindEvents();
     applyTheme();
-    render();
   </script>
 </body>
 
