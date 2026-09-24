@@ -19,6 +19,7 @@
     // Choices for select fields in the memory editor
     const choices = { Duplex: ['', '+', '-', 'split', 'off'], Tone: ['', 'Tone', 'TSQL', 'DTCS', 'DTCS-R', 'Cross'], DtcsPolarity: ['NN', 'NR', 'RN', 'RR'], CrossMode: ['Tone->Tone', 'Tone->DTCS', 'DTCS->Tone', 'DTCS->DTCS'], Mode: ['FM', 'NFM', 'AM', 'WFM', 'USB', 'LSB', 'DV'], Skip: ['', 'S'] };
     
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
@@ -288,6 +289,9 @@
       border: 1px solid var(--line);
       padding: .5rem;
     }
+    th.action div div#copy-options-container[open] {
+      display: flex;
+    }
     td {
       font-size: .76rem;
     }
@@ -503,7 +507,7 @@
                   id="total-count"><script>document.write(GT5R_CHANNEL_COUNT);</script></span> channels</div>
             <input id="filter" placeholder="name, frequency, comment">
           </label>
-          <label><input id="hide-empty" class="button secondary" type="checkbox">Hide empty channels</label>
+          <label><input id="hide-empty" type="checkbox">Hide empty channels</label>
         </div>
 
         <div class="actions">
@@ -526,37 +530,60 @@
           </thead>
           <tbody id="table-body">
             <script>
-              const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
 
-              const tbody = document.querySelector('#table-body');
+const tbody = document.querySelector('#table-body');
 
-              Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
-                const row = document.createElement('tr');
-                row.setAttribute('data-location', i);
+Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
+  const row = document.createElement('tr');
+  row.setAttribute('data-location', i);
 
-                const channelTD = document.createElement('td');
-                channelTD.className = 'channel';
-                channelTD.textContent = i;
-                row.appendChild(channelTD);
+  const channelTD = document.createElement('td');
+  channelTD.className = 'channel';
+  channelTD.textContent = i;
+  row.appendChild(channelTD);
 
-                headers.slice(1).forEach((header) => {
-                  const td = document.createElement('td');
-                  const value = "";//escapeHtml(memory[header]);
-                  td.innerHTML = choices[header]
-                    ? `<select data-field="${header}">${choices[header].map((choice) => `
-                        <option value="${choice}">${escapeHtml(choice) || 'none'}</option>`).join('')}
-                      </select>`
-                    : `<input data-field="${header}" type="text">`;
-                    
-                  row.appendChild(td);
-                });
-                
-                const actionTD = document.createElement('td');
-                actionTD.className = 'action';
-                actionTD.innerHTML = `<button class="tertiary" data-action="clear" title="Clear channel">Clear</button>`;
-                row.appendChild(actionTD);
-                tbody.appendChild(row);
-              })
+  headers.slice(1).forEach((header) => {
+    const td = document.createElement('td');
+    td.innerHTML = choices[header]
+      ? `<select data-field="${header}">${choices[header].map((choice) => `
+          <option value="${choice}">${escapeHtml(choice) || 'none'}</option>`).join('')}
+        </select>`
+      : `<input data-field="${header}" type="text">`;
+      
+    row.appendChild(td);
+  });
+  
+  const actionTD = document.createElement('td');
+  actionTD.className = 'action';
+  actionTD.innerHTML = `<button class="tertiary" data-action="clear" title="Clear channel">Clear</button>`;
+  row.appendChild(actionTD);
+  tbody.appendChild(row);
+});
+
+const visibleChannels = () => {
+const hideEmpty = document.getElementById('hide-empty').checked;
+const query = document.getElementById('filter').value.trim().toLowerCase();
+let visible = 0;
+  document.querySelectorAll('[data-location]').forEach((row) => {
+    const isMatchingChannel = !query || row.dataset.location.toLowerCase().includes(query);
+
+    const dataFields = row.querySelectorAll("[data-field]");
+    const allEmptyFields = hideEmpty && Array.from(dataFields).every((field) => {
+      const defaultValue = choices[field.dataset.field]?.[0] ?? '';
+      return field.value === defaultValue;
+    });
+    const hasMatchingField = !query || Array.from(dataFields).some((field) => {
+      return field.value.toLowerCase().includes(query);
+    });
+    if ((isMatchingChannel || hasMatchingField) && !allEmptyFields) {
+      row.classList.remove('hidden');
+      visible += 1;
+    } else {
+      row.classList.add('hidden');
+    }
+  });
+  document.querySelector('#visible-count').textContent = visible;
+};
             </script>
           </tbody>
         </table>
@@ -593,13 +620,11 @@
                   <label><select id="copy-destination">
                     <option value="">--</option>
                     <script>document.addEventListener('DOMContentLoaded', function() {
-                      for(let i=0; i < GT5R_CHANNEL_COUNT; i++) {
-                        const option = document.createElement('option');
-                        option.value = i;
-                        option.textContent = i;
-                        document.querySelector('#copy-destination').appendChild(option);
+                      const copyDestination = document.querySelector('#copy-destination');
+                      for (let channel = 0; channel < GT5R_CHANNEL_COUNT; channel++) {
+                        copyDestination.add(new Option(channel, channel));
                       }
-                      document.querySelector('#copy-destination').value = ''; 
+                      copyDestination.value = '';
                     });</script>
                   </select> Copy Destination</label>
                   <label title="Copy selected channels without gaps"><input type="checkbox" id="copy-contiguously" /> Copy contiguously</label>
@@ -630,57 +655,16 @@
   <script>
     const makeMemory = (values) => Object.assign({ Location: '', Name: '', Frequency: '', Duplex: '', Offset: '', Tone: '', rToneFreq: '', cToneFreq: '', DtcsCode: '', DtcsPolarity: 'NN', RxDtcsCode: '', CrossMode: 'Tone->Tone', Mode: 'FM', TStep: '', Skip: '', Power: '', Comment: '' }, values || {});
    
+    // TODO: use byte array to visually represent memory contents
     let memories = [];
 
     let sourceMemories = [];
     let fileName = 'chirp-export.csv';
     let theme = localStorage.getItem('chirp-theme') || 'auto';
 
-    const csvValue = (value) => /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
-    const visibleMemories = () => {
-      const hideEmpty = document.getElementById('hide-empty').checked;
-      const query = document.getElementById('filter').value.trim().toLowerCase();
-      let visible = 0;
-      document.querySelectorAll('[data-location]').forEach((row) => {
-        const isMatchingChannel = !query || row.dataset.location.toLowerCase().includes(query);
-
-        const dataFields = row.querySelectorAll("[data-field]");
-        const allEmptyFields = hideEmpty && Array.from(dataFields).every((field) => {
-          const defaultValue = choices[field.dataset.field]?.[0] ?? '';
-          return field.value === defaultValue;
-        });
-        const hasMatchingField = !query || Array.from(dataFields).some((field) => {
-          return field.value.toLowerCase().includes(query);
-        });
-        if ((isMatchingChannel || hasMatchingField) && !allEmptyFields) {
-          row.classList.remove('hidden');
-          visible += 1;
-        } else {
-          row.classList.add('hidden');
-        }
-      });
-      document.querySelector('#visible-count').textContent = visible;
-    };
-
-    function parseCsv(text) {
-      const rows = []; let row = [], cell = '', quoted = false;
-      for (let index = 0; index < text.length; index += 1) {
-        const character = text[index];
-        if (character === '"' && text[index + 1] === '"' && quoted) { cell += '"'; index += 1; }
-        else if (character === '"') quoted = !quoted;
-        else if (character === ',' && !quoted) { row.push(cell); cell = ''; }
-        else if ((character === '\n' || character === '\r') && !quoted) { if (character === '\r' && text[index + 1] === '\n') index += 1; row.push(cell); if (row.some(Boolean)) rows.push(row); row = []; cell = ''; }
-        else cell += character;
-      }
-      if (cell || row.length) { row.push(cell); rows.push(row); }
-      const headerRow = rows.findIndex((candidate) => candidate.includes('Location'));
-      if (headerRow < 0) throw new Error('This file does not contain a CHIRP CSV header.');
-      const sourceHeaders = rows[headerRow];
-      return rows.slice(headerRow + 1).map((values) => makeMemory(Object.fromEntries(headers.map((header) => { const sourceIndex = sourceHeaders.indexOf(header); return [header, sourceIndex >= 0 ? values[sourceIndex] || '' : '']; })))).filter((memory) => memory.Frequency || memory.Name);
-    }
 
     function render() {
-      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${escapeHtml(memory.Location)}"><td class="channel">${escapeHtml(memory.Location)}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
+      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${memory.Location}"><td class="channel">${memory.Location}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
       document.querySelector('#copy-all').disabled = sourceMemories.length === 0;
       document.querySelectorAll('[imported-location]').forEach((cell) => cell.addEventListener('click', importedLocationClick));
       document.querySelectorAll('[data-field]').forEach((control) => control.addEventListener('change', updateMemory));
@@ -689,12 +673,22 @@
     }
 
     function bindEvents() {
-      document.querySelector('#filter').addEventListener('input', visibleMemories);
-      document.querySelector('#hide-empty').addEventListener('change', visibleMemories);
+      document.querySelector('#theme').addEventListener('click', cycleTheme);
+
+      document.querySelector('#filter').addEventListener('input', visibleChannels);
+      document.querySelector('#hide-empty').addEventListener('change', visibleChannels);
+
+      document.querySelector('#export').addEventListener('click', downloadCsv);
+      // document.querySelector("#write-serial").addEventListener('click', writeSerial);
+
       document.querySelector('#import').addEventListener('change', importCsv);
       document.querySelector('#copy-all').addEventListener('click', copyAllSources);
       document.querySelector('#copy-selected').addEventListener('click', copySelectedSources);
-      document.querySelector('#copy-options-container').style.display = 'none';
+
+      document.querySelector('#copy-options').addEventListener('click', () => {
+        const container = document.querySelector('#copy-options-container');
+        container.hasAttribute("open") ? container.removeAttribute("open") : container.setAttribute("open", "");
+      });
       document.querySelector("label:has(#copy-destination)").addEventListener('click', (event) => {
         /*prevent default prevents
 
@@ -713,12 +707,7 @@ I guess just let the error happen.*/
         //document.querySelector("label:has(#copy-destination)")
         document.getElementById('copy-destination').showPicker();
       });
-      document.querySelector('#copy-options').addEventListener('click', () => {
-        const container = document.querySelector('#copy-options-container');
-        container.style.display = container.style.display === 'none' ? 'flex' : 'none';
-      });
-      document.querySelector('#theme').addEventListener('click', cycleTheme);
-      document.querySelector('#export').addEventListener('click', downloadCsv);
+
       const readSerialButton = document.querySelector('#read-serial');
       if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
       else readSerialButton.addEventListener('click', readFromGt5r);
@@ -761,44 +750,46 @@ I guess just let the error happen.*/
       event.stopPropagation();
 
       const copy = makeMemory({ ...sourceMemories[Number(event.target.dataset.sourceIndex)] });
-
       const startingAt = document.getElementById('copy-destination').value;
+      
       if(startingAt) copy.Location = startingAt;
 
       copyMemory(copy);
-      visibleMemories();
+
+      visibleChannels();
       showStatus('Channel copied to main', '#memory');
     }
 
     function copyAllSources() {
       const startingAt = document.getElementById('copy-destination').value;
+      const firstSelected = sourceMemories[0].Location;
+      const startingIndex = startingAt === "" 
+        ? Number(firstSelected)
+        : Number(startingAt);
+      const copyContigious = document.getElementById('copy-contiguously').checked;
 
-      // rows are labeled starting from 1
-      // so do that for --, I guess.
-      const startingIndex = startingAt === "" ? 1 : Number(startingAt);
       sourceMemories.forEach((memory, i) => {
-        const newLocation = startingIndex + i;
+        const newLocation = copyContigious 
+          ? startingIndex + i 
+          : startingIndex + Number(memory.Location) - Number(firstSelected);
         if(newLocation < GT5R_CHANNEL_COUNT){
-          copyMemory({...makeMemory({ ...memory, Location: String(startingIndex + i) })});
+          copyMemory({...makeMemory({ ...memory, Location: String(newLocation) })});
         } else {
           console.log(`skipping ${memory.Location} because it exceeds the channel count`);
         }
       });
-      visibleMemories();
+
+      visibleChannels();
       showStatus(`${sourceMemories.length} channels copied to main`, '#memory');
     }
 
     function copySelectedSources() {
-
       const selectedRows = [...document.querySelectorAll('[row-selected]')].map(row => row.getAttribute('imported-location'));
       if(selectedRows.length === 0) return;
 
       const firstSelected = selectedRows[0];
       const startingAt = document.getElementById('copy-destination').value || selectedRows[0];
-
-      // rows are labeled starting from 1
-      // so do that for --, I guess.
-      const startingIndex = startingAt === "" ? 1 : Number(startingAt);
+      const startingIndex = startingAt === "" ? Number(firstSelected) : Number(startingAt);
 
       const selectedMemories = sourceMemories.filter((memory) => selectedRows.includes(memory.Location));
       
@@ -816,7 +807,8 @@ I guess just let the error happen.*/
           console.log(`skipping ${memory.Location} because it exceeds the channel count`);
         }
       });
-      visibleMemories();
+
+      visibleChannels();
       showStatus(`${selectedRows.length} channels copied to main`, '#memory');
     }
     
@@ -827,9 +819,9 @@ I guess just let the error happen.*/
         const dataField = field.dataset.field;
         field.value = choices[dataField]?.[0] ?? '';
       }
-      showStatus('Channel cleared', '#memory');
 
-      visibleMemories();
+      visibleChannels();
+      showStatus('Channel cleared', '#memory');
     }
 
     function showStatus(message, section = '#memory') {
@@ -847,6 +839,7 @@ I guess just let the error happen.*/
     }
 
     function downloadCsv() {
+      const csvValue = (value) => /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
       const content = [
         headers.join(','),
         ...memories.map((memory) => headers.map((header) => csvValue(memory[header])).join(','))
@@ -857,6 +850,23 @@ I guess just let the error happen.*/
       link.download = fileName; link.click();
       URL.revokeObjectURL(link.href); 
       showStatus('CSV exported', '#memory');
+    }
+
+    function parseCsv(text) {
+      const rows = []; let row = [], cell = '', quoted = false;
+      for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        if (character === '"' && text[index + 1] === '"' && quoted) { cell += '"'; index += 1; }
+        else if (character === '"') quoted = !quoted;
+        else if (character === ',' && !quoted) { row.push(cell); cell = ''; }
+        else if ((character === '\n' || character === '\r') && !quoted) { if (character === '\r' && text[index + 1] === '\n') index += 1; row.push(cell); if (row.some(Boolean)) rows.push(row); row = []; cell = ''; }
+        else cell += character;
+      }
+      if (cell || row.length) { row.push(cell); rows.push(row); }
+      const headerRow = rows.findIndex((candidate) => candidate.includes('Location'));
+      if (headerRow < 0) throw new Error('This file does not contain a CHIRP CSV header.');
+      const sourceHeaders = rows[headerRow];
+      return rows.slice(headerRow + 1).map((values) => makeMemory(Object.fromEntries(headers.map((header) => { const sourceIndex = sourceHeaders.indexOf(header); return [header, sourceIndex >= 0 ? values[sourceIndex] || '' : '']; })))).filter((memory) => memory.Frequency || memory.Name);
     }
     
     function importCsv(event) {
@@ -950,6 +960,7 @@ I guess just let the error happen.*/
         sourceMemories = gt5rParseImage(data);
         showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#source");
         fileName = 'gt5r-read.csv';
+        render();
         showStatus(`${sourceMemories.length} channels read from GT-5R`, "#source");
       } catch (error) {
         showStatus(error.message || 'Failed to read from radio', "#source");
