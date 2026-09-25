@@ -10,6 +10,20 @@
     const GT5R_DTCS = [23, 25, 26, 31, 32, 36, 43, 47, 51, 53, 54, 65, 71, 72, 73, 74, 114, 115, 116, 122, 125, 131, 132, 134, 143, 145, 152, 155, 156, 162, 165, 172, 174, 205, 212, 223, 225, 226, 243, 244, 245, 246, 251, 252, 255, 261, 263, 265, 266, 271, 274, 306, 311, 315, 325, 331, 332, 343, 346, 351, 356, 364, 365, 371, 411, 412, 413, 423, 431, 432, 445, 446, 452, 454, 455, 462, 464, 465, 466, 503, 506, 516, 523, 526, 532, 546, 565, 606, 612, 624, 627, 631, 632, 645, 654, 662, 664, 703, 712, 723, 731, 732, 734, 743, 754];
     const GT5R_CHANNEL_COUNT = 128;
     const GT5R_BAUD_RATE = 9600;
+    const RESPONSE_SUCCESS = 0x06;
+    const CHUNK_SIZE = 0x40;
+    const CHANNEL_MEMORY_START = 0x0000;
+    const CHANNEL_MEMORY_END = 0x1800;
+    const OTHER_MEMORY_START = 0x1E80;
+    const OTHER_MEMORY_END = 0x1FC0;
+    /**
+     * IDENT is used to identify the device.
+     * This array contains the bytes used to uniquely identify the Baofeng GT-5R device.
+     * 170 (0xAA) is the first byte of the identifier.
+     * 221 (0xDD) is the last byte of the identifier.
+     * Byte[3] (0x04) is not 0x2(vhf_220_radio).
+     */
+    const IDENT = [170,48,118,4,0,5,32,221];
 
     // 
     // Table headers for the memory editor
@@ -465,6 +479,15 @@
       background-color: var(--panel);
     }
 
+    #device-memory {
+      display: block;
+      width: 100%;
+      height: 18rem;
+      margin-bottom: 1rem;
+      background: var(--paper);
+      border: 1px solid var(--line);
+    }
+
     @media (max-width: 700px) {
       .toolbar {
         align-items: flex-start;
@@ -641,6 +664,10 @@ let visible = 0;
       </section>
     </section>
 
+    <canvas id="device-memory">
+      
+    </canvas>
+
     <section class="table-section">
       <div class="table-heading">
         <div>
@@ -685,9 +712,16 @@ let visible = 0;
       document.querySelector('#copy-all').addEventListener('click', copyAllSources);
       document.querySelector('#copy-selected').addEventListener('click', copySelectedSources);
 
-      document.querySelector('#copy-options').addEventListener('click', () => {
+      document.querySelector('#copy-options').addEventListener('click', (event) => {
+        event.stopPropagation();
         const container = document.querySelector('#copy-options-container');
         container.hasAttribute("open") ? container.removeAttribute("open") : container.setAttribute("open", "");
+      });
+      document.body.addEventListener('click', (event) => {
+        const container = document.querySelector('#copy-options-container');
+        if (!container.contains(event.target) && container.hasAttribute("open")) {
+          container.removeAttribute("open");
+        }
       });
       document.querySelector("label:has(#copy-destination)").addEventListener('click', (event) => {
         /*prevent default prevents
@@ -751,7 +785,7 @@ I guess just let the error happen.*/
 
       const copy = makeMemory({ ...sourceMemories[Number(event.target.dataset.sourceIndex)] });
       const startingAt = document.getElementById('copy-destination').value;
-      
+
       if(startingAt) copy.Location = startingAt;
 
       copyMemory(copy);
@@ -832,6 +866,7 @@ I guess just let the error happen.*/
     function applyTheme() {
       document.documentElement.style.colorScheme = theme === 'auto' ? 'light dark' : theme;
       document.querySelector('#theme').textContent = `Theme: ${theme}`;
+      if (typeof drawDeviceMemory === 'function') drawDeviceMemory();
     }
     
     function cycleTheme() {
@@ -1030,10 +1065,58 @@ I guess just let the error happen.*/
         const entryDiv = document.createElement('div');
         entryDiv.textContent = logEntry;
         logContainer.appendChild(entryDiv);
-        entryDiv.scrollIntoView();
+        logsContainer.children[0].scrollTo(0, logsContainer.children[0].scrollHeight);
       }
     }
 
+    /**
+     * Represents the memory of the device.
+     * Each index corresponds to a memory address, and the value is the 64-byte data chunk read from that address.
+     */
+    const deviceMemory = new Array(CHANNEL_MEMORY_END/CHUNK_SIZE);
+
+    function drawDeviceMemory() {
+      const canvas = document.querySelector('#device-memory');
+      const context = canvas.getContext('2d');
+      if (!context) return;
+
+      const columns = 128;
+      const rows = Math.ceil(CHANNEL_MEMORY_END / columns);
+      const pixelRatio = window.devicePixelRatio || 1;
+      const width = Math.max(canvas.clientWidth, 320);
+      const cellSize = Math.max(2, Math.floor(width / columns));
+      const height = rows * cellSize;
+      canvas.width = width * pixelRatio;
+      canvas.height = height * pixelRatio;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.clearRect(0, 0, width, height);
+
+      context.fillStyle = "#002244";
+      context.fillRect(0, 0, width, height);
+
+      for (let i = 0; i < deviceMemory.length; i++) {
+        const chunk = deviceMemory[i];
+        drawChunk(context, cellSize, columns, chunk, i);
+      }
+      context.globalAlpha = 1;
+    }
+
+    function drawChunk(context, cellSize, columns, chunk, i) {
+        const baseAddress = i * CHUNK_SIZE;
+        for (let offset = 0; offset < CHUNK_SIZE; offset++) {
+          const address = baseAddress + offset;
+          const value = chunk ? chunk[offset] : undefined;
+          const column = address % columns;
+          const row = Math.floor(address / columns);
+          const intensity = value ? value / 255 : 1;
+          context.globalAlpha = intensity;
+          context.fillStyle = value === undefined ? "#FF0000" : "#FFFFFF";
+          context.fillRect(column * cellSize, row * cellSize, cellSize, cellSize);
+        }
+    }
+
+    drawDeviceMemory();
+    window.addEventListener('resize', drawDeviceMemory);
     async function gt5rDownload(byteReader, onProgress) {
       try {
         let identBytes = null, lastError = null;
@@ -1041,16 +1124,26 @@ I guess just let the error happen.*/
         catch (error) { lastError = error; await sleep(500); }
         
         if (!identBytes) throw lastError || new Error('Radio did not respond to identification.');
+        identBytes.forEach((byte, index) => {
+          if(identBytes[index] !== IDENT[index]) throw new Error('Radio identification mismatch.');
+        });
         
-        const chunks = [identBytes];
-        for (let addr = 0; addr < 0x1800; addr += 0x40) {
-          chunks.push(await gt5rReadBlock(byteReader, addr, 0x40, addr === 0));
-          if (onProgress) onProgress(addr + 0x40, 0x1800);
+        const chunks = [];
+        for (let addr = CHANNEL_MEMORY_START; addr < CHANNEL_MEMORY_END; addr += CHUNK_SIZE) {
+          
+          const chunk = await gt5rReadBlock(byteReader, addr, addr === 0);
+          chunks.push(chunk);
+          deviceMemory[Math.floor(addr / CHUNK_SIZE)] = chunk;
+          if (onProgress) onProgress(addr + CHUNK_SIZE, CHANNEL_MEMORY_END);
+          drawDeviceMemory();
         }
         
+        // create a single array of the length of the chunks combined
         const data = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
         let offset = 0;
+        // copy each chunk into the combined data array
         for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+        //drawDeviceMemory();
         return data;
       } finally {
         try { await byteReader.reader.cancel(); } catch (error) { /* ignore */ }
@@ -1058,8 +1151,11 @@ I guess just let the error happen.*/
         byteReader.writer.releaseLock();
       }
     }
-
-    const RESPONSE_SUCCESS = 0x06;
+    /**
+     * Initiate Cloning mode, and then Request the Identity from the GT-5R radio. Needs to be run before any cloning operations.
+     * @param {SerialByteReaderWriterWithLogger} byteReader - The byte reader for communication.
+     * @returns {Promise<Uint8Array>} The identification data from the radio.
+     */
     async function gt5rIdent(byteReader) {
       const REQUEST_CLONING_MODE_COMMAND = [0x50, 0xBB, 0xFF, 0x20, 0x12, 0x07, 0x25];
       await byteReader.writeBytes(REQUEST_CLONING_MODE_COMMAND); 
@@ -1091,8 +1187,18 @@ I guess just let the error happen.*/
       return new Uint8Array(ident);
     }
 
-    async function gt5rReadBlock(byteReader, start, size, firstCommand) {
-      await byteReader.writeBytes([0x53, (start >> 8) & 0xff, start & 0xff, size]);
+
+    /**
+     * Read a 64-byte block of data from the GT-5R radio. TODO: check for dropped byte?
+     * @param {SerialByteReaderWriterWithLogger} byteReader - The byte reader for communication.
+     * @param {number} start - The starting address of the block.
+     * Ranges from 0 to 0x1800(6144) for Channel Memory.
+     * Ranges from 0x1E80(7808) to 0x1FC0(8128) for Other Memory(Settings and Firmware version).
+     * @param {boolean} firstCommand - Whether this is the first command in the sequence.
+     * @returns {Promise<Uint8Array>} The data chunk read from the radio.
+     */
+    async function gt5rReadBlock(byteReader, start, firstCommand) {
+      await byteReader.writeBytes([0x53, (start >> 8) & 0xff, start & 0xff, CHUNK_SIZE]);
       if (!firstCommand) {
         const ack = await byteReader.readBytes(1, 2000);
         if (ack[0] !== RESPONSE_SUCCESS) throw new Error(`Radio refused to send block 0x${start.toString(16)}`);
@@ -1100,23 +1206,77 @@ I guess just let the error happen.*/
       
       const header = await byteReader.readBytes(4, 2000);
       const addr = (header[1] << 8) | header[2];
-      if (header[0] !== 0x58 || addr !== start || header[3] !== size) throw new Error(`Unexpected response for block 0x${start.toString(16)}`);
+      if (header[0] !== 0x58 || addr !== start || header[3] !== CHUNK_SIZE) throw new Error(`Unexpected response for block 0x${start.toString(16)}`);
 
-      const chunk = await byteReader.readBytes(size, 2000);
+      const chunk = await byteReader.readBytes(CHUNK_SIZE, 2000);
       await byteReader.writeBytes([RESPONSE_SUCCESS]);
       // await sleep(50);
       return chunk;
     }
 
+    /**
+     * Decode the channel name from the GT-5R radio data.
+     * TODO: decode per block. Each channel takes up 16 bytes in memory.
+     * So each block contains 4 channels.
+     * Names are in later blocks.
+     * @param {Uint8Array} data - The raw data from the radio.
+     * @param {number} index - The channel index.
+     * @returns {string} The decoded channel name.
+     */
     function gt5rParseImage(data) {
       const channels = [];
       for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
       return channels;
     }
 
+    /**
+     * Decode the channel name from the GT-5R radio data.
+     * TODO: decode per block. Each channel takes up 16 bytes in memory.
+     * @param {Uint8Array} data - The raw data from the radio.
+     * @param {number} index - The channel index.
+     * @returns {string} The decoded channel name.
+     */
     function gt5rDecodeChannel(data, index) {
-      const memOffset = 0x0008 + index * 16;
-      const nameOffset = 0x1008 + index * 16;
+      const channelData = gt5rDecodeChannelData(data, index);
+      if (!channelData) return null;
+      const { rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan, duplex, offset, pol, txmode, rtone, dtcsCode, rxmode, ctone, rxDtcsCode, tmode, crossMode } = channelData;
+      
+      const name = gt5rDecodeChannelName(data, index);
+
+      return makeMemory({
+        Location: index,
+        Name: name.trimEnd(),
+        Frequency: gt5rFreq(rxRaw * 10),
+        Duplex: duplex,
+        Offset: gt5rFreq(offset),
+        Tone: tmode,
+        rToneFreq: rtone !== null ? rtone.toFixed(1) : '',
+        cToneFreq: ctone !== null ? ctone.toFixed(1) : '',
+        DtcsCode: dtcsCode !== null ? String(dtcsCode).padStart(3, '0') : '',
+        DtcsPolarity: pol.join(''),
+        RxDtcsCode: rxDtcsCode !== null ? String(rxDtcsCode).padStart(3, '0') : '',
+        CrossMode: crossMode,
+        Mode: wide ? 'FM' : 'NFM',
+        TStep: '',
+        Skip: scan ? '' : 'S',
+        Power: lowpower === 1 ? 'Low' : 'High',
+        Comment: '',
+      });
+    }
+
+    /**
+     * Decode the channel data from the GT-5R radio memory.
+     * TODO: move to block-based decoding. Each channel takes up 16 bytes in memory. So we can decode 4 channels per 64-byte block.
+     * Each channel's data is stored in a 16-byte block.
+     * The first 8 bytes contain the RX and TX frequencies.
+     * The next 4 bytes contain the tone information.
+     * The last 4 bytes contain the power, wide, scan, and duplex settings.
+     * @param {Uint8Array} data - The raw data from the radio.
+     * @param {number} index - The channel index.
+     * @returns {object|null} The decoded channel data, or null if the channel is empty.
+     */
+    function gt5rDecodeChannelData(data, index) {
+      const memOffset = 0x0000 + index * 16;
       const rec = data.subarray(memOffset, memOffset + 16);
       if (rec[0] === 0xff) return null;
 
@@ -1153,28 +1313,43 @@ I guess just let the error happen.*/
       else if (txmode === rxmode && txmode === 'DTCS' && dtcsCode === rxDtcsCode) tmode = 'DTCS';
       else if (rxmode || txmode) { tmode = 'Cross'; crossMode = `${txmode}->${rxmode}`; }
 
-      let name = '';
-      for (let i = 0; i < 7; i += 1) { const code = data[nameOffset + i]; name += code === 0xff ? ' ' : String.fromCharCode(code); }
+      return {
+        rxRaw,
+        txRaw,
+        isTxInh,
+        rxtoneVal,
+        txtoneVal,
+        lowpower,
+        wide,
+        scan,
+        duplex,
+        offset,
+        pol,
+        txmode,
+        rtone,
+        dtcsCode,
+        rxmode,
+        ctone,
+        rxDtcsCode,
+        tmode,
+        crossMode,
+      }
+    }
 
-      return makeMemory({
-        Location: index,
-        Name: name.trimEnd(),
-        Frequency: gt5rFreq(rxRaw * 10),
-        Duplex: duplex,
-        Offset: gt5rFreq(offset),
-        Tone: tmode,
-        rToneFreq: rtone !== null ? rtone.toFixed(1) : '',
-        cToneFreq: ctone !== null ? ctone.toFixed(1) : '',
-        DtcsCode: dtcsCode !== null ? String(dtcsCode).padStart(3, '0') : '',
-        DtcsPolarity: pol.join(''),
-        RxDtcsCode: rxDtcsCode !== null ? String(rxDtcsCode).padStart(3, '0') : '',
-        CrossMode: crossMode,
-        Mode: wide ? 'FM' : 'NFM',
-        TStep: '',
-        Skip: scan ? '' : 'S',
-        Power: lowpower === 1 ? 'Low' : 'High',
-        Comment: '',
-      });
+    /**
+     * Decode the channel name from the GT-5R radio data.
+     * TODO: decode per block. Each channel name takes up 16 bytes in memory.
+     * So each block contains 4 channels.
+     * Names are in later blocks.
+     * @param {Uint8Array} data - The raw data from the radio.
+     * @param {number} index - The channel index.
+     * @returns {string} The decoded channel name.
+     */
+    function gt5rDecodeChannelName(data, index) {
+      let name = '';
+      const nameOffset = 0x1000 + index * 16;
+      for (let i = 0; i < 7; i += 1) { const code = data[nameOffset + i]; name += code === 0xff ? ' ' : String.fromCharCode(code); }
+      return name;
     }
 
     function gt5rLbcd4(bytes) { let value = 0; for (let i = 3; i >= 0; i -= 1) value = value * 100 + gt5rBcdByte(bytes[i]); return value; }
