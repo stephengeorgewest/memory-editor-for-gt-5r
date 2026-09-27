@@ -12,6 +12,7 @@
     const GT5R_BAUD_RATE = 9600;
     const RESPONSE_SUCCESS = 0x06;
     const CHUNK_SIZE = 0x40;
+    const CHANNEL_SIZE = 0x10;
     const CHANNEL_MEMORY_START = 0x0000;
     const CHANNEL_MEMORY_END = 0x1800;
     const OTHER_MEMORY_START = 0x1E80;
@@ -481,8 +482,6 @@
 
     #device-memory {
       display: block;
-      width: 100%;
-      height: 18rem;
       margin-bottom: 1rem;
       background: var(--paper);
       border: 1px solid var(--line);
@@ -664,9 +663,11 @@ let visible = 0;
       </section>
     </section>
 
-    <canvas id="device-memory">
-      
-    </canvas>
+    <section class="memory-visualization">
+      <canvas id="device-memory">
+        
+      </canvas>
+    </section>
 
     <section class="table-section">
       <div class="table-heading">
@@ -1075,24 +1076,22 @@ I guess just let the error happen.*/
      */
     const deviceMemory = new Array(CHANNEL_MEMORY_END/CHUNK_SIZE);
 
+    /**
+     * Draws the current state of the device memory onto the canvas.
+     */
     function drawDeviceMemory() {
       const canvas = document.querySelector('#device-memory');
       const context = canvas.getContext('2d');
       if (!context) return;
 
-      const columns = 128;
+      const columns = 16;
       const rows = Math.ceil(CHANNEL_MEMORY_END / columns);
-      const pixelRatio = window.devicePixelRatio || 1;
-      const width = Math.max(canvas.clientWidth, 320);
-      const cellSize = Math.max(2, Math.floor(width / columns));
-      const height = rows * cellSize;
-      canvas.width = width * pixelRatio;
-      canvas.height = height * pixelRatio;
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-      context.clearRect(0, 0, width, height);
-
-      context.fillStyle = "#002244";
-      context.fillRect(0, 0, width, height);
+      const cellSize = 1;
+      const width = rows * cellSize;
+      const height = 16;
+      canvas.width = width;
+      canvas.height = height;
+      clearCanvas(context, width, height);
 
       for (let i = 0; i < deviceMemory.length; i++) {
         const chunk = deviceMemory[i];
@@ -1100,14 +1099,35 @@ I guess just let the error happen.*/
       }
       context.globalAlpha = 1;
     }
+    /**
+     * Clears the canvas and fills it with the background color.
+     * @param {CanvasRenderingContext2D} context - The canvas context to clear.
+     * @param {number} width - The width of the canvas.
+     * @param {number} height - The height of the canvas.
+     */
+    function clearCanvas(context, width, height) {
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, width, height);
 
+      context.fillStyle = "#002244";
+      context.fillRect(0, 0, width, height);
+    }
+    /**
+     * Draws a single chunk of memory onto the canvas.
+     * @param {CanvasRenderingContext2D} context - The canvas context to draw on.
+     * @param {number} cellSize - The size of each cell in the visualization.
+     * @param {number} columns - The number of columns in the visualization.
+     * @param {Uint8Array} chunk - The memory chunk to draw.
+     * @param {number} i - The index of the chunk.
+     */
     function drawChunk(context, cellSize, columns, chunk, i) {
         const baseAddress = i * CHUNK_SIZE;
-        for (let offset = 0; offset < CHUNK_SIZE; offset++) {
-          const address = baseAddress + offset;
-          const value = chunk ? chunk[offset] : undefined;
-          const column = address % columns;
-          const row = Math.floor(address / columns);
+        for (let i =0; i< CHUNK_SIZE/CHANNEL_SIZE; i++)
+        for (let offset = 0; offset < CHANNEL_SIZE; offset++) {
+          const address = baseAddress + i * CHANNEL_SIZE + offset;
+          const value = chunk ? chunk[i * CHANNEL_SIZE + offset] : undefined;
+          const column = Math.floor(address / columns);
+          const row = address % columns;
           const intensity = value ? value / 255 : 1;
           context.globalAlpha = intensity;
           context.fillStyle = value === undefined ? "#FF0000" : "#FFFFFF";
@@ -1116,7 +1136,7 @@ I guess just let the error happen.*/
     }
 
     drawDeviceMemory();
-    window.addEventListener('resize', drawDeviceMemory);
+    /*window.addEventListener('resize', drawDeviceMemory);*/
     async function gt5rDownload(byteReader, onProgress) {
       try {
         let identBytes = null, lastError = null;
