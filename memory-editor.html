@@ -526,6 +526,12 @@
           <p id="memory-status" role="status">Editable channels ready for export.</p>
         </div>
       </div>
+
+    <section class="memory-visualization">
+      <canvas id="device-memory">
+        
+      </canvas>
+    </section>
       <section class="toolbar">
         <div>
           <label class="search">
@@ -533,12 +539,13 @@
                   id="total-count"><script>document.write(GT5R_CHANNEL_COUNT);</script></span> channels</div>
             <input id="filter" placeholder="name, frequency, comment">
           </label>
-          <label><input id="hide-empty" type="checkbox">Hide empty channels</label>
+          <label><input id="hide-empty" type="checkbox" checked>Hide empty channels</label>
         </div>
 
         <div class="actions">
           <button id="export" class="primary">Export CSV</button>
           <button id="write-serial" class="primary" disabled>Write to GT-5R</button>
+          <button id="read-serial" class="secondary" type="button">Read from GT-5R</button>
         </div>
       </section>
       <section class="grid-shell">
@@ -562,6 +569,7 @@ const tbody = document.querySelector('#table-body');
 Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
   const row = document.createElement('tr');
   row.setAttribute('data-location', i);
+  row.classList.add('hidden');
 
   const channelTD = document.createElement('td');
   channelTD.className = 'channel';
@@ -625,7 +633,6 @@ let visible = 0;
         <div class="actions">
           <label class="button secondary">Import CSV<input id="import" type="file" accept=".csv,text/csv"
               hidden></label>
-          <button id="read-serial" class="secondary" type="button">Read from GT-5R</button>
         </div>
       </div>
       <section class="grid-shell source-shell">
@@ -665,12 +672,6 @@ let visible = 0;
           </tbody>
         </table>
       </section>
-    </section>
-
-    <section class="memory-visualization">
-      <canvas id="device-memory">
-        
-      </canvas>
     </section>
 
     <section class="table-section">
@@ -987,23 +988,23 @@ I guess just let the error happen.*/
       try {
         const byteReader = new SerialByteReaderWriterWithLogger(port);
         await byteReader.open();
-        showStatus('Reading from GT-5R\u2026', "#source");
+        showStatus('Reading from GT-5R\u2026', "#memory");
         readSerialButton.disabled = true;
         readSerialButton.style.setProperty('--progress', '0%');
 
         const data = await gt5rDownload(byteReader, (done, total) => {
           // TODO: can we parse data as we download it?
           const progress = Math.round((done / total) * 100);
-          showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#source");
+          showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#memory");
           readSerialButton.style.setProperty('--progress', `${progress}%`);
         });
         sourceMemories = gt5rParseImage(data);
-        showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#source");
+        showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#memory");
         fileName = 'gt5r-read.csv';
         render();
-        showStatus(`${sourceMemories.length} channels read from GT-5R`, "#source");
+        showStatus(`${sourceMemories.length} channels read from GT-5R`, "#memory");
       } catch (error) {
-        showStatus(error.message || 'Failed to read from radio', "#source");
+        showStatus(error.message || 'Failed to read from radio', "#memory");
       } finally {
         try { await port.close(); } catch (error) { /* already closed */ }
         readSerialButton.disabled = false;
@@ -1160,7 +1161,8 @@ I guess just let the error happen.*/
         identBytes.forEach((byte, index) => {
           if(identBytes[index] !== IDENT[index]) throw new Error('Radio identification mismatch.');
         });
-        
+        const visibleCountElement = document.querySelector('#visible-count');
+
         const canvas = document.querySelector('#device-memory');
         const context = canvas.getContext('2d');
         
@@ -1236,9 +1238,10 @@ I guess just let the error happen.*/
               console.log(channelIndex, "0x"+addr.toString(16), nameData, tr, nameField);
               if (nameField) nameField.value = nameData ? nameData.trim() : '';
             }
+
+            visibleChannels();
           }
           if (onProgress) onProgress(addr + CHUNK_SIZE, CHANNEL_MEMORY_END);
-
         }
         
         // create a single array of the length of the chunks combined
