@@ -14,6 +14,10 @@
     const CHUNK_SIZE = 0x40;
     const CHANNEL_SIZE = 0x10;
     const CHANNEL_MEMORY_START = 0x0000;
+    const CHANNEL_MEMORY_DATA_END = 0x0800; //only 128 channels
+    const CHANNEL_MEMORY_NAME_SIZE = 0x10;
+    const CHANNEL_MEMORY_NAME_REAL_SIZE = 0x07;
+    const CHANNEL_MEMORY_NAMES_START = 0x1000;
     const CHANNEL_MEMORY_END = 0x1800;
     const OTHER_MEMORY_START = 0x1E80;
     const OTHER_MEMORY_END = 0x1FC0;
@@ -1084,59 +1088,68 @@ I guess just let the error happen.*/
       const context = canvas.getContext('2d');
       if (!context) return;
 
-      const columns = 16;
-      const rows = Math.ceil(CHANNEL_MEMORY_END / columns);
-      const cellSize = 1;
-      const width = rows * cellSize;
-      const height = 16;
-      canvas.width = width;
-      canvas.height = height;
-      clearCanvas(context, width, height);
+      canvas.width = Math.ceil(CHANNEL_MEMORY_END / CHANNEL_SIZE);
+      canvas.height = CHANNEL_SIZE + 2;
 
       for (let i = 0; i < deviceMemory.length; i++) {
         const chunk = deviceMemory[i];
-        drawChunk(context, cellSize, columns, chunk, i);
+        drawChunk(context, chunk, i * CHUNK_SIZE);
       }
-      context.globalAlpha = 1;
-    }
-    /**
-     * Clears the canvas and fills it with the background color.
-     * @param {CanvasRenderingContext2D} context - The canvas context to clear.
-     * @param {number} width - The width of the canvas.
-     * @param {number} height - The height of the canvas.
-     */
-    function clearCanvas(context, width, height) {
-      context.setTransform(1, 0, 0, 1, 0, 0);
-      context.clearRect(0, 0, width, height);
 
-      context.fillStyle = "#002244";
-      context.fillRect(0, 0, width, height);
+      // Draw channel memory data indicator
+      const channelMemoryDataWidth = CHANNEL_MEMORY_DATA_END / CHANNEL_SIZE;
+      const channelMemoryDataImageData = context.getImageData(
+        0, canvas.height - 1,
+        channelMemoryDataWidth, 1
+      );
+      for(let i = 0; i < channelMemoryDataImageData.data.length / 4; i++) {
+        channelMemoryDataImageData.data[i * 4 + 0] = 0;
+        channelMemoryDataImageData.data[i * 4 + 1] = 255;
+        channelMemoryDataImageData.data[i * 4 + 2] = 128;
+        channelMemoryDataImageData.data[i * 4 + 3] = 255;
+      }
+      context.putImageData(channelMemoryDataImageData, 0, canvas.height - 1);
+
+      // draw channel memory names indicator
+      const channelMemoryNameImageStart = CHANNEL_MEMORY_NAMES_START / CHANNEL_SIZE;
+      const channelMemoryNameImageWidth = (CHANNEL_MEMORY_NAMES_START - CHANNEL_MEMORY_END) / CHANNEL_SIZE;
+      const channelMemoryNameImageData = context.getImageData(
+        channelMemoryNameImageStart, canvas.height - 1,
+        channelMemoryNameImageWidth, 1
+      );
+      for(let i = 0; i < channelMemoryNameImageData.data.length / 4; i++) {
+        channelMemoryNameImageData.data[i * 4 + 0] = 255;
+        channelMemoryNameImageData.data[i * 4 + 1] = 196;
+        channelMemoryNameImageData.data[i * 4 + 2] = 255;
+        channelMemoryNameImageData.data[i * 4 + 3] = 255;
+      }
+      context.putImageData(channelMemoryNameImageData, channelMemoryNameImageStart, canvas.height - 1);
     }
+
     /**
      * Draws a single chunk of memory onto the canvas.
      * @param {CanvasRenderingContext2D} context - The canvas context to draw on.
-     * @param {number} cellSize - The size of each cell in the visualization.
-     * @param {number} columns - The number of columns in the visualization.
      * @param {Uint8Array} chunk - The memory chunk to draw.
-     * @param {number} i - The index of the chunk.
+     * @param {number} baseAddress - The base address of the chunk.
      */
-    function drawChunk(context, cellSize, columns, chunk, i) {
-        const baseAddress = i * CHUNK_SIZE;
-        for (let i =0; i< CHUNK_SIZE/CHANNEL_SIZE; i++)
-        for (let offset = 0; offset < CHANNEL_SIZE; offset++) {
-          const address = baseAddress + i * CHANNEL_SIZE + offset;
-          const value = chunk ? chunk[i * CHANNEL_SIZE + offset] : undefined;
-          const column = Math.floor(address / columns);
-          const row = address % columns;
-          const intensity = value ? value / 255 : 1;
-          context.globalAlpha = intensity;
-          context.fillStyle = value === undefined ? "#FF0000" : "#FFFFFF";
-          context.fillRect(column * cellSize, row * cellSize, cellSize, cellSize);
-        }
+    function drawChunk(context, chunk, baseAddress) {
+      //TODO: get chunk of imagedata and write all at once instead of per pixel
+      const imageData = context.getImageData(baseAddress/CHUNK_SIZE, CHUNK_SIZE/CHANNEL_SIZE, 1, 1);
+      for (let channelIndex = 0; channelIndex < CHUNK_SIZE/CHANNEL_SIZE; channelIndex++)
+      for (let offset = 0; offset < CHANNEL_SIZE; offset++) {
+        const address = baseAddress + channelIndex * CHANNEL_SIZE + offset;
+        const value = chunk ? chunk[channelIndex * CHANNEL_SIZE + offset] : undefined;
+        const column = Math.floor(address / CHANNEL_SIZE);
+        const row = address % CHANNEL_SIZE;
+        imageData.data[0] = value === undefined ? 255 : value;
+        imageData.data[1] = value === undefined ? 0 : value;
+        imageData.data[2] = value === undefined ? 0 : value;
+        imageData.data[3] = 255;
+        context.putImageData(imageData, column, row);
+      }
     }
 
     drawDeviceMemory();
-    /*window.addEventListener('resize', drawDeviceMemory);*/
     async function gt5rDownload(byteReader, onProgress) {
       try {
         let identBytes = null, lastError = null;
@@ -1148,14 +1161,84 @@ I guess just let the error happen.*/
           if(identBytes[index] !== IDENT[index]) throw new Error('Radio identification mismatch.');
         });
         
+        const canvas = document.querySelector('#device-memory');
+        const context = canvas.getContext('2d');
+        
         const chunks = [];
-        for (let addr = CHANNEL_MEMORY_START; addr < CHANNEL_MEMORY_END; addr += CHUNK_SIZE) {
-          
+        for (let chunkIndex = CHANNEL_MEMORY_START; chunkIndex < CHANNEL_MEMORY_END/CHUNK_SIZE; chunkIndex++) {
+          const addr = CHANNEL_MEMORY_START + chunkIndex * CHUNK_SIZE;
           const chunk = await gt5rReadBlock(byteReader, addr, addr === 0);
           chunks.push(chunk);
-          deviceMemory[Math.floor(addr / CHUNK_SIZE)] = chunk;
+          deviceMemory[chunkIndex] = chunk;
+          drawChunk(context, chunk, addr);
+
+          for(let channelInChunk = 0; channelInChunk < CHUNK_SIZE/CHANNEL_SIZE/*4*/; channelInChunk++) {
+            const channelSubarray = chunk.subarray(channelInChunk*CHANNEL_SIZE, channelInChunk*CHANNEL_SIZE + CHANNEL_SIZE);
+
+            if(addr < CHANNEL_MEMORY_DATA_END){
+              const channelIndex = chunkIndex * 4 + channelInChunk;
+              const channelData = gt5rDecodeChannelDataFromBlockSegment(channelSubarray);
+              console.log(channelIndex, "0x"+addr.toString(16),channelData);
+              if (!channelData) continue;
+
+              const headerToChannelData = []
+              if(channelData) {
+                // TODO: alter table to show fields as stored in radio.
+                // rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan
+                const tr = document.querySelector(`[data-location="${channelIndex}"]`);
+                const frequencyField = tr?.querySelector('[data-field="Frequency"]');
+                if (frequencyField) frequencyField.value = gt5rFreq(channelData.rxRaw);
+
+                const duplexField = tr?.querySelector('[data-field="Duplex"]');
+                if (duplexField) duplexField.value = channelData.duplex;
+
+                const offsetField = tr?.querySelector('[data-field="Offset"]');
+                if (offsetField) offsetField.value = gt5rFreqOffset(channelData.offset);
+
+                const toneField = tr?.querySelector('[data-field="Tone"]');
+                if (toneField) toneField.value = channelData.tmode;
+
+                const rToneFreqField = tr?.querySelector('[data-field="rToneFreq"]');
+                if (rToneFreqField) rToneFreqField.value = channelData.rTone?.toFixed(1) ?? '';
+
+                const cToneFreqField = tr?.querySelector('[data-field="cToneFreq"]');
+                if (cToneFreqField) cToneFreqField.value = channelData.cTone?.toFixed(1)?? '';
+
+                const dtcsCodeField = tr?.querySelector('[data-field="DtcsCode"]');
+                if (dtcsCodeField) dtcsCodeField.value = channelData.dtcsCode ? String(channelData.dtcsCode).padStart(3, 0) ?? '' : '';
+
+                const DtcsPolarityField = tr?.querySelector('[data-field="DtcsPolarity"]');
+                if (DtcsPolarityField) DtcsPolarityField.value = channelData.pol.join('');
+
+                const RxDtcsCodeField = tr?.querySelector('[data-field="RxDtcsCode"]');
+                if (RxDtcsCodeField) RxDtcsCodeField.value = channelData.rxDtcsCode ? String(channelData.rxDtcsCode).padStart(3, 0) ?? '': '';
+
+                const CrossModeField = tr?.querySelector('[data-field="CrossMode"]');
+                if (CrossModeField) CrossModeField.value = channelData.crossMode;
+
+                const ModeField = tr?.querySelector('[data-field="Mode"]');
+                if (ModeField) ModeField.value = channelData.wide ? 'FM' : 'NFM';
+
+                const SkipField = tr?.querySelector('[data-field="Skip"]');
+                if (SkipField) SkipField.value = channelData.scan ? '' : 'S';
+
+                const PowerField = tr?.querySelector('[data-field="Power"]');
+                if (PowerField) PowerField.value = channelData.lowpower === 1 ? 'Low' : 'High';
+              }
+
+            } else if (addr >= CHANNEL_MEMORY_NAMES_START) {
+              const channelIndex = (addr - CHANNEL_MEMORY_NAMES_START) / CHUNK_SIZE * 4 + channelInChunk;
+              const nameData = gt5rDecodeChannelNameFromBlock(channelSubarray);
+              if (!nameData) continue;
+
+              const tr = document.querySelector(`[data-location="${channelIndex}"]`);
+              const nameField = tr?.querySelector('[data-field="Name"]');
+              console.log(channelIndex, "0x"+addr.toString(16), nameData, tr, nameField);
+              if (nameField) nameField.value = nameData ? nameData.trim() : '';
+            }
+          }
           if (onProgress) onProgress(addr + CHUNK_SIZE, CHANNEL_MEMORY_END);
-          drawDeviceMemory();
+
         }
         
         // create a single array of the length of the chunks combined
@@ -1235,9 +1318,7 @@ I guess just let the error happen.*/
     }
 
     /**
-     * Decode the channel name from the GT-5R radio data.
-     * TODO: decode per block. Each channel takes up 16 bytes in memory.
-     * So each block contains 4 channels.
+     * Decode the channel data from the GT-5R radio data.
      * Names are in later blocks.
      * @param {Uint8Array} data - The raw data from the radio.
      * @param {number} index - The channel index.
@@ -1251,10 +1332,9 @@ I guess just let the error happen.*/
 
     /**
      * Decode the channel name from the GT-5R radio data.
-     * TODO: decode per block. Each channel takes up 16 bytes in memory.
      * @param {Uint8Array} data - The raw data from the radio.
      * @param {number} index - The channel index.
-     * @returns {string} The decoded channel name.
+     * @returns {object|null} The decoded channel data, or null if the channel is empty.
      */
     function gt5rDecodeChannel(data, index) {
       const channelData = gt5rDecodeChannelData(data, index);
@@ -1266,9 +1346,9 @@ I guess just let the error happen.*/
       return makeMemory({
         Location: index,
         Name: name.trimEnd(),
-        Frequency: gt5rFreq(rxRaw * 10),
+        Frequency: gt5rFreq(rxRaw),
         Duplex: duplex,
-        Offset: gt5rFreq(offset),
+        Offset: gt5rFreqOffset(offset),
         Tone: tmode,
         rToneFreq: rtone !== null ? rtone.toFixed(1) : '',
         cToneFreq: ctone !== null ? ctone.toFixed(1) : '',
@@ -1286,11 +1366,7 @@ I guess just let the error happen.*/
 
     /**
      * Decode the channel data from the GT-5R radio memory.
-     * TODO: move to block-based decoding. Each channel takes up 16 bytes in memory. So we can decode 4 channels per 64-byte block.
      * Each channel's data is stored in a 16-byte block.
-     * The first 8 bytes contain the RX and TX frequencies.
-     * The next 4 bytes contain the tone information.
-     * The last 4 bytes contain the power, wide, scan, and duplex settings.
      * @param {Uint8Array} data - The raw data from the radio.
      * @param {number} index - The channel index.
      * @returns {object|null} The decoded channel data, or null if the channel is empty.
@@ -1298,6 +1374,19 @@ I guess just let the error happen.*/
     function gt5rDecodeChannelData(data, index) {
       const memOffset = 0x0000 + index * 16;
       const rec = data.subarray(memOffset, memOffset + 16);
+      return gt5rDecodeChannelDataFromBlockSegment(rec);
+    }
+    /**
+     * Decode the channel data from a 16-byte block segment.
+     * 
+     * The first 8 bytes contain the RX and TX frequencies.
+     * The next 4 bytes contain the tone information.
+     * The last 4 bytes contain the power, wide, scan, and duplex settings.
+     * 
+     * @param {Uint8Array} rec - The 16-byte block segment containing the channel data.
+     * @returns {object|null} The decoded channel data, or null if the channel is empty.
+     */
+    function gt5rDecodeChannelDataFromBlockSegment(rec) {
       if (rec[0] === 0xff) return null;
 
       const rxRaw = gt5rLbcd4(rec.subarray(0, 4));
@@ -1358,8 +1447,7 @@ I guess just let the error happen.*/
 
     /**
      * Decode the channel name from the GT-5R radio data.
-     * TODO: decode per block. Each channel name takes up 16 bytes in memory.
-     * So each block contains 4 channels.
+     * Each channel name takes up 16 bytes in memory, but only uses the first 7 bytes.
      * Names are in later blocks.
      * @param {Uint8Array} data - The raw data from the radio.
      * @param {number} index - The channel index.
@@ -1367,15 +1455,38 @@ I guess just let the error happen.*/
      */
     function gt5rDecodeChannelName(data, index) {
       let name = '';
-      const nameOffset = 0x1000 + index * 16;
-      for (let i = 0; i < 7; i += 1) { const code = data[nameOffset + i]; name += code === 0xff ? ' ' : String.fromCharCode(code); }
+      const nameOffset = CHANNEL_MEMORY_NAMES_START + index * CHANNEL_MEMORY_NAME_SIZE;
+      const nameBlock = data.slice(nameOffset, nameOffset + CHANNEL_MEMORY_NAME_REAL_SIZE);
+      return gt5rDecodeChannelNameFromBlock(nameBlock);
+    }
+
+    /**
+     * Decode the channel name from a block of memory.
+     * @param {Uint8Array} nameBlock - The block of memory (7+ bytes) containing the channel name.
+     * @returns {string} The decoded channel name.
+     */
+    function gt5rDecodeChannelNameFromBlock(nameBlock) {
+      let name = '';
+      for (let i = 0; i < CHANNEL_MEMORY_NAME_REAL_SIZE; i += 1) { const code = nameBlock[i]; name += code === 0xff ? ' ' : String.fromCharCode(code); }
       return name;
     }
 
     function gt5rLbcd4(bytes) { let value = 0; for (let i = 3; i >= 0; i -= 1) value = value * 100 + gt5rBcdByte(bytes[i]); return value; }
     function gt5rBcdByte(byte) { return ((byte >> 4) & 0xf) * 10 + (byte & 0xf); }
 
-    function gt5rFreq(units) { return (units / 1e6).toFixed(6); }
+    /**
+     * Convert a frequency from GT-5R units(10 Hz) to MHz.
+     * @param {number} units - The frequency in GT-5R units.
+     * @returns {string} The frequency in MHz as a string with 5 decimal places (10 Hz resolution).
+     */
+    function gt5rFreq(units) { return (units * 10 / 1e6).toFixed(5); }
+
+    /**
+     * Convert a frequency offset from GT-5R units(1 Hz) to MHz.
+     * @param {number} units - The frequency offset in GT-5R units.
+     * @returns {string} The frequency offset in MHz as a string with 6 decimal places (1 Hz resolution?).
+     */
+    function gt5rFreqOffset(units) { return (units / 1e6).toFixed(6); }
 
     bindEvents();
     applyTheme();
