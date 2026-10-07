@@ -8,6 +8,29 @@
   <title>Memory Editor for Baofeng GT-5R</title>
   <script>
     const GT5R_DTCS = [23, 25, 26, 31, 32, 36, 43, 47, 51, 53, 54, 65, 71, 72, 73, 74, 114, 115, 116, 122, 125, 131, 132, 134, 143, 145, 152, 155, 156, 162, 165, 172, 174, 205, 212, 223, 225, 226, 243, 244, 245, 246, 251, 252, 255, 261, 263, 265, 266, 271, 274, 306, 311, 315, 325, 331, 332, 343, 346, 351, 356, 364, 365, 371, 411, 412, 413, 423, 431, 432, 445, 446, 452, 454, 455, 462, 464, 465, 466, 503, 506, 516, 523, 526, 532, 546, 565, 606, 612, 624, 627, 631, 632, 645, 654, 662, 664, 703, 712, 723, 731, 732, 734, 743, 754];
+    const GT5R_DCS_CODE_TABLE = [
+      ...GT5R_DTCS.map((code, index) => ({
+        number: String(index + 1).padStart(3, '0'),
+        code: `D${String(code).padStart(3, '0')}N`,
+        value: index + 1,
+      })),
+      ...GT5R_DTCS.map((code, index) => ({
+        number: String(index + 106).padStart(3, '0'),
+        code: `D${String(code).padStart(3, '0')}I`,
+        value: index + 0x6a,
+      })),
+    ];
+    const GT5R_CTCSS_CODE_TABLE = [
+      67.0, 69.3, 71.9, 74.4, 77.0, 79.7, 82.5, 85.4, 88.5, 91.5,
+      94.8, 97.4, 100.0, 103.5, 107.2, 110.9, 114.8, 118.8, 123.0, 127.3,
+      131.8, 136.5, 141.3, 146.2, 151.4, 156.7, 159.8, 162.2, 165.5, 167.9,
+      171.3, 173.8, 177.8, 179.9, 183.5, 186.2, 189.9, 192.8, 196.6, 199.3,
+      203.5, 206.5, 210.7, 218.1, 225.7, 229.1, 233.6, 241.8, 250.3, 254.1,
+    ].map((frequency, index) => ({
+      number: String(index + 1).padStart(2, '0'),
+      code: frequency.toFixed(1),
+      value: Math.round(frequency * 10),
+    }));
     const GT5R_CHANNEL_COUNT = 128;
     const GT5R_BAUD_RATE = 9600;
     const RESPONSE_SUCCESS = 0x06;
@@ -37,11 +60,11 @@
 
     const memoryHeaders = [
       'name', // 7bytes
-      'rx', // 4bytes 10hz resolution? manual entry only allows for 0.25kHz increments via the 6.25kHz step
-      'tx', // 4bytes (above) or FFFFFFFF (unset?/ tx is rx/ duplex off offset=0)
+      'rxFrequency', // 4bytes 10hz resolution? manual entry only allows for 0.25kHz increments via the 6.25kHz step
+      'txFrequency', // 4bytes (above) or FFFFFFFF (unset?/ tx is rx/ duplex off offset=0)
       //'isTxInh',
-      'rxtoneVal', // 2bytes
-      'txtoneVal', // 2bytes
+      'rxToneValue', // 2bytes
+      'txToneValue', // 2bytes
       'lowpower',  //bit
       'wide', //bit FM/NFM
       'scan' //bit // skip?
@@ -49,11 +72,16 @@
 
     // Choices for select fields in the memory editor
     const choices = { Duplex: ['', '+', '-', 'split', 'off'], Tone: ['', 'Tone', 'TSQL', 'DTCS', 'DTCS-R', 'Cross'], DtcsPolarity: ['NN', 'NR', 'RN', 'RR'], CrossMode: ['Tone->Tone', 'Tone->DTCS', 'DTCS->Tone', 'DTCS->DTCS'], Mode: ['FM', 'NFM', 'AM', 'WFM', 'USB', 'LSB', 'DV'], Skip: ['', 'S'] };
-
-    // duplex off frequencies
-    const DUPLEX_OFF_FREQUENCIES = [
-      [144000000, 148000000],
-      [420000000, 450000000]
+    // US version:144-148MHz, 420-450MHz (TX) & 136-174MHz, 400-480MHz(RX) 
+    // frequencies in 10HZ
+    const RX_FREQUENCIES = [
+      [13600000, 17400000],
+      [40000000, 48000000]
+    ];
+//FRS is 462MHz-467 MHz range, so this radio can't transmit on FRS.
+    const TX_FREQUENCIES = [
+      [14400000, 14800000],
+      [42000000, 45000000]
     ];
 
     /**
@@ -112,7 +140,6 @@
 
     body {
       margin: 0;
-      min-width: 320px;
     }
 
     .masthead {
@@ -221,6 +248,11 @@
       outline-offset: 1px;
     }
 
+    input#hide-empty{
+      margin-left: auto;
+      margin-right: 0;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -253,7 +285,6 @@
       background: transparent;
       border-color: var(--tertiary-border);
       color: var(--rust);
-      font-size: .68rem;
       padding: .35rem .5rem;
     }
 
@@ -304,12 +335,12 @@
       border-bottom: 1px solid var(--line-soft);
       text-align: left;
       white-space: nowrap;
+      width: 0;
     }
 
     th {
       background: var(--panel);
       color: var(--heading-ink);
-      font-size: .64rem;
       font-weight: 500;
       letter-spacing: .08em;
       position: sticky;
@@ -331,9 +362,6 @@
     }
     th.action div div#copy-options-container[open] {
       display: flex;
-    }
-    td {
-      font-size: .76rem;
     }
 
     tr.hidden {
@@ -358,7 +386,8 @@
     }
 
     .channel {
-      width: 4em;
+      width: 3em;
+      min-width: 3em;
       left: 0;
     }
 
@@ -371,7 +400,8 @@
       z-index: 3;
     }
     td.channel, th {
-      padding-left: 0.4rem
+      padding-left: 0.4rem;
+      padding-right: 0.4rem;
     }
 
     td input,
@@ -387,6 +417,7 @@
     th.name,td.name {
       width: 5rem;
       min-width: 5rem;
+      padding-left: 0.2rem
     }
     th.rx, th.tx, td.rx, td.tx {
       width: 7rem;
@@ -395,6 +426,9 @@
     th.rxtoneVal, th.txtoneVal, td.rxtoneVal, td.txtoneVal {
       width: 4rem;
       min-width: 4rem;
+    }
+    td.scan {
+      padding-right: 0.2rem;
     }
 
     td input[readonly] {
@@ -405,6 +439,7 @@
     input[type="checkbox"], label:has(select) {
       cursor: pointer;
       accent-color: var(--leaf);
+      margin:auto;
     }
 
     label:has(> input[type="checkbox"]) {
@@ -562,11 +597,11 @@
         </div>
       </div>
 
-    <section class="memory-visualization">
-      <canvas id="device-memory">
-        
-      </canvas>
-    </section>
+      <section class="memory-visualization">
+        <canvas id="device-memory">
+          
+        </canvas>
+      </section>
       <section class="toolbar">
         <div>
           <label class="search">
@@ -584,6 +619,38 @@
         </div>
       </section>
       <section class="grid-shell">
+        <datalist id="ToneValue-datalist">
+          <option value="0">0 - Clear</option>
+          <script>
+            GT5R_DCS_CODE_TABLE.forEach((code) => {
+              document.write(`<option value="${code.value}">DCS - ${code.number} - ${code.code}</option>`);
+            });
+            GT5R_CTCSS_CODE_TABLE.forEach((code) => {
+              document.write(`<option value="${code.value}">CTCSS - ${code.number} - ${code.code}</option>`);
+            });
+          </script>
+        </datalist>
+
+        <datalist id="rxFrequency-datalist">
+          <option value="166666665">unset - same as rx</option>
+          <script>
+            RX_FREQUENCIES.forEach(([lowfreq, highfreq], index) => {
+              for(let i=lowfreq; i <= highfreq; i += 250)
+                document.write(`<option value="${i}">${index === 0 ? 'VHF' : 'UHF'} - ${i/100000} MHz</option>`);
+            });
+          </script>
+        </datalist>
+
+        <datalist id="txFrequency-datalist">
+          <option value="166666665">unset - same as rx</option>
+          <script>
+            TX_FREQUENCIES.forEach(([lowfreq, highfreq], band) => {
+              for(let frequency=lowfreq; frequency <= highfreq; frequency += 250)
+                document.write(`<option value="${frequency}">${band === 0 ? 'VHF' : 'UHF'} - ${frequency/100000} MHz</option>`);
+            });
+          </script>
+        </datalist>
+        
         <table>
           <thead>
             <tr>
@@ -614,12 +681,14 @@ Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
   memoryHeaders.forEach((header) => {
     const td = document.createElement('td');
     td.className = header;
-    td.innerHTML =  `<input data-field="${header}" type="${
-      header === 'name'
+    td.innerHTML =  `<input data-field="${header}"
+    list="${header.endsWith('ToneValue') ? 'ToneValue' : header}-datalist"
+    type="${
+      /*header === 'name'
       ? 'text'
-      : header === 'lowpower' || header === 'wide' || header === 'scan' 
+      : */header === 'lowpower' || header === 'wide' || header === 'scan' 
       ? 'checkbox':
-      'number'
+      'text'
     }">`;
     row.appendChild(td);
   });
@@ -894,7 +963,8 @@ I guess just let the error happen.*/
       const fields = row.querySelectorAll('[data-field]');
       for(const field of fields) {
         const dataField = field.dataset.field;
-        field.value = choices[dataField]?.[0] ?? '';
+        field.value = '';
+        field.checked = false;
       }
 
       visibleChannels();
@@ -1227,17 +1297,17 @@ I guess just let the error happen.*/
                 const frequencyField = tr?.querySelector('[data-field="Frequency"]');
                 if (frequencyField) frequencyField.value = /*gt5rFreq(*/channelData.rxRaw/*)*/;
 
-                const duplexField = tr?.querySelector('[data-field="rx"]');
+                const duplexField = tr?.querySelector('[data-field="rxFrequency"]');
                 if (duplexField) duplexField.value =  channelData.rxRaw;
 
-                const offsetField = tr?.querySelector('[data-field="tx"]');
+                const offsetField = tr?.querySelector('[data-field="txFrequency"]');
                 if (offsetField) offsetField.value =  channelData.txRaw;
 
-                const rxToneField = tr?.querySelector('[data-field="rxtoneVal"]');
-                if (rxToneField) rxToneField.value = channelData.rxtoneVal;
+                const rxToneField = tr?.querySelector('[data-field="rxToneValue"]');
+                if (rxToneField) rxToneField.value = channelData.rxToneValue;
 
-                const txToneField = tr?.querySelector('[data-field="txtoneVal"]');
-                if (txToneField) txToneField.value = channelData.txtoneVal;
+                const txToneField = tr?.querySelector('[data-field="txToneValue"]');
+                if (txToneField) txToneField.value = channelData.txToneValue;
 
                /* const rToneFreqField = tr?.querySelector('[data-field="rToneFreq"]');
                 if (rToneFreqField) rToneFreqField.value = channelData.rTone?.toFixed(1) ?? '';
@@ -1433,8 +1503,8 @@ I guess just let the error happen.*/
       const rxRaw = gt5rLbcd4(rec.subarray(0, 4));
       const txRaw = gt5rLbcd4(rec.subarray(4, 8));
       const isTxInh = rec[4] === 0xff && rec[5] === 0xff && rec[6] === 0xff && rec[7] === 0xff;
-      const rxtoneVal = rec[8] | (rec[9] << 8);
-      const txtoneVal = rec[10] | (rec[11] << 8);
+      const rxToneValue = rec[8] | (rec[9] << 8);
+      const txToneValue = rec[10] | (rec[11] << 8);
       const lowpower = rec[14] & 0x03;
       const wide = (rec[15] >> 6) & 0x1;
       const scan = (rec[15] >> 2) & 0x1;
@@ -1447,14 +1517,14 @@ I guess just let the error happen.*/
 
       const pol = ['N', 'N'];
       let txmode = '', rtone = null, dtcsCode = null;
-      if (txtoneVal !== 0 && txtoneVal !== 0xffff) {
-        if (txtoneVal >= 0x258) { txmode = 'Tone'; rtone = txtoneVal / 10.0; }
-        else { txmode = 'DTCS'; const idx = txtoneVal >= 0x6a ? (pol[0] = 'R', txtoneVal - 0x6a) : txtoneVal - 1; dtcsCode = GT5R_DTCS[idx]; }
+      if (txToneValue !== 0 && txToneValue !== 0xffff) {
+        if (txToneValue >= 0x258) { txmode = 'Tone'; rtone = txToneValue / 10.0; }
+        else { txmode = 'DTCS'; const idx = txToneValue >= 0x6a ? (pol[0] = 'R', txToneValue - 0x6a) : txToneValue - 1; dtcsCode = GT5R_DTCS[idx]; }
       }
       let rxmode = '', ctone = null, rxDtcsCode = null;
-      if (rxtoneVal !== 0 && rxtoneVal !== 0xffff) {
-        if (rxtoneVal >= 0x258) { rxmode = 'Tone'; ctone = rxtoneVal / 10.0; }
-        else { rxmode = 'DTCS'; const idx = rxtoneVal >= 0x6a ? (pol[1] = 'R', rxtoneVal - 0x6a) : rxtoneVal - 1; rxDtcsCode = GT5R_DTCS[idx]; }
+      if (rxToneValue !== 0 && rxToneValue !== 0xffff) {
+        if (rxToneValue >= 0x258) { rxmode = 'Tone'; ctone = rxToneValue / 10.0; }
+        else { rxmode = 'DTCS'; const idx = rxToneValue >= 0x6a ? (pol[1] = 'R', rxToneValue - 0x6a) : rxToneValue - 1; rxDtcsCode = GT5R_DTCS[idx]; }
       }
 
       let tmode = '', crossMode = 'Tone->Tone';
@@ -1467,8 +1537,8 @@ I guess just let the error happen.*/
         rxRaw,
         txRaw,
         isTxInh,
-        rxtoneVal,
-        txtoneVal,
+        rxToneValue,
+        txToneValue,
         lowpower,
         wide,
         scan,
