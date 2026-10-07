@@ -33,11 +33,35 @@
     // 
     // Table headers for the memory editor
     // header[0] is only used in csv import/export
-    const headers = ['Location', 'Name', 'Frequency', 'Duplex', 'Offset', 'Tone', 'rToneFreq', 'cToneFreq', 'DtcsCode', 'DtcsPolarity', 'RxDtcsCode', 'CrossMode', 'Mode', 'TStep', 'Skip', 'Power', 'Comment'];
+    const csvHeaders = ['Location', 'Name', 'Frequency', 'Duplex', 'Offset', 'Tone', 'rToneFreq', 'cToneFreq', 'DtcsCode', 'DtcsPolarity', 'RxDtcsCode', 'CrossMode', 'Mode', 'TStep', 'Skip', 'Power', 'Comment'];
+
+    const memoryHeaders = [
+      'name', // 7bytes
+      'rx', // 4bytes 10hz resolution? manual entry only allows for 0.25kHz increments via the 6.25kHz step
+      'tx', // 4bytes (above) or FFFFFFFF (unset?/ tx is rx/ duplex off offset=0)
+      //'isTxInh',
+      'rxtoneVal', // 2bytes
+      'txtoneVal', // 2bytes
+      'lowpower',  //bit
+      'wide', //bit FM/NFM
+      'scan' //bit // skip?
+    ];
 
     // Choices for select fields in the memory editor
     const choices = { Duplex: ['', '+', '-', 'split', 'off'], Tone: ['', 'Tone', 'TSQL', 'DTCS', 'DTCS-R', 'Cross'], DtcsPolarity: ['NN', 'NR', 'RN', 'RR'], CrossMode: ['Tone->Tone', 'Tone->DTCS', 'DTCS->Tone', 'DTCS->DTCS'], Mode: ['FM', 'NFM', 'AM', 'WFM', 'USB', 'LSB', 'DV'], Skip: ['', 'S'] };
-    
+
+    // duplex off frequencies
+    const DUPLEX_OFF_FREQUENCIES = [
+      [144000000, 148000000],
+      [420000000, 450000000]
+    ];
+
+    /**
+     * Valid characters for memory names.
+     * Only printable ASCII characters (0x20 " " to 0x5E "^"") are allowed.
+     * ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 !@#$%^&*()+-=[]:\";'<>?,./
+     */
+    const validChar = /^[\x20-\x5E]*$/;
     const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
   </script>
   <style>
@@ -273,14 +297,11 @@
 
     table {
       border-collapse: collapse;
-      min-width: 1240px;
-      width: 100%;
     }
 
     th,
     td {
       border-bottom: 1px solid var(--line-soft);
-      padding: .7rem .8rem;
       text-align: left;
       white-space: nowrap;
     }
@@ -292,7 +313,7 @@
       font-weight: 500;
       letter-spacing: .08em;
       position: sticky;
-      text-transform: uppercase;
+      /* text-transform: uppercase; */
       top: 0;
       z-index: 1;
     }
@@ -342,12 +363,15 @@
     }
 
     .action {
-      width: 16em;
+      max-width: 13em;
       right: 0;
     }
 
     th.channel {
       z-index: 3;
+    }
+    td.channel, th {
+      padding-left: 0.4rem
     }
 
     td input,
@@ -357,9 +381,20 @@
       border-bottom: 1px solid transparent;
       color: inherit;
       font: inherit;
-      min-width: 5.2rem;
       padding: .25rem .15rem;
       width: 100%;
+    }
+    th.name,td.name {
+      width: 5rem;
+      min-width: 5rem;
+    }
+    th.rx, th.tx, td.rx, td.tx {
+      width: 7rem;
+      min-width: 7rem;
+    }
+    th.rxtoneVal, th.txtoneVal, td.rxtoneVal, td.txtoneVal {
+      width: 4rem;
+      min-width: 4rem;
     }
 
     td input[readonly] {
@@ -554,8 +589,8 @@
             <tr>
               <th class="channel">#</th>
               <script>
-                headers.slice(1).forEach((header) => {
-                  document.write(`<th>${header}</th>`);
+                memoryHeaders.forEach((header) => {
+                  document.write(`<th class="${header}">${header}</th>`);
                 });
               </script>
               <th class="action"></th>
@@ -576,14 +611,16 @@ Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
   channelTD.textContent = i;
   row.appendChild(channelTD);
 
-  headers.slice(1).forEach((header) => {
+  memoryHeaders.forEach((header) => {
     const td = document.createElement('td');
-    td.innerHTML = choices[header]
-      ? `<select data-field="${header}">${choices[header].map((choice) => `
-          <option value="${choice}">${escapeHtml(choice) || 'none'}</option>`).join('')}
-        </select>`
-      : `<input data-field="${header}" type="text">`;
-      
+    td.className = header;
+    td.innerHTML =  `<input data-field="${header}" type="${
+      header === 'name'
+      ? 'text'
+      : header === 'lowpower' || header === 'wide' || header === 'scan' 
+      ? 'checkbox':
+      'number'
+    }">`;
     row.appendChild(td);
   });
   
@@ -604,7 +641,7 @@ let visible = 0;
     const dataFields = row.querySelectorAll("[data-field]");
     const allEmptyFields = hideEmpty && Array.from(dataFields).every((field) => {
       const defaultValue = choices[field.dataset.field]?.[0] ?? '';
-      return field.value === defaultValue;
+      return field.dataset.field === 'lowpower' || field.dataset.field === 'wide' || field.dataset.field === 'scan' ? !field.checked : field.value === '';
     });
     const hasMatchingField = !query || Array.from(dataFields).some((field) => {
       return field.value.toLowerCase().includes(query);
@@ -641,7 +678,7 @@ let visible = 0;
             <tr>
               <th class="channel">#</th>
               <script>
-                headers.slice(1).forEach(header => {
+                csvHeaders.slice(1).forEach(header => {
                   document.write(`<th>${header}</th>`);
                 });
               </script>
@@ -697,7 +734,7 @@ let visible = 0;
 
 
     function render() {
-      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${memory.Location}"><td class="channel">${memory.Location}</td>${headers.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
+      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${memory.Location}"><td class="channel">${memory.Location}</td>${csvHeaders.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
       document.querySelector('#copy-all').disabled = sourceMemories.length === 0;
       document.querySelectorAll('[imported-location]').forEach((cell) => cell.addEventListener('click', importedLocationClick));
       document.querySelectorAll('[data-field]').forEach((control) => control.addEventListener('change', updateMemory));
@@ -780,7 +817,7 @@ I guess just let the error happen.*/
 
       if (existing) {
         existing.childNodes.forEach((node, i) => {
-          node.childNodes[0].value = memory[headers[i]];
+          node.childNodes[0].value = memory[csvHeaders[i]];
         });
       } 
     }
@@ -882,8 +919,8 @@ I guess just let the error happen.*/
     function downloadCsv() {
       const csvValue = (value) => /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
       const content = [
-        headers.join(','),
-        ...memories.map((memory) => headers.map((header) => csvValue(memory[header])).join(','))
+        csvHeaders.join(','),
+        ...memories.map((memory) => csvHeaders.map((header) => csvValue(memory[header])).join(','))
       ].join('\n') + '\n';
 
       const link = document.createElement('a');
@@ -907,7 +944,7 @@ I guess just let the error happen.*/
       const headerRow = rows.findIndex((candidate) => candidate.includes('Location'));
       if (headerRow < 0) throw new Error('This file does not contain a CHIRP CSV header.');
       const sourceHeaders = rows[headerRow];
-      return rows.slice(headerRow + 1).map((values) => makeMemory(Object.fromEntries(headers.map((header) => { const sourceIndex = sourceHeaders.indexOf(header); return [header, sourceIndex >= 0 ? values[sourceIndex] || '' : '']; })))).filter((memory) => memory.Frequency || memory.Name);
+      return rows.slice(headerRow + 1).map((values) => makeMemory(Object.fromEntries(csvHeaders.map((header) => { const sourceIndex = sourceHeaders.indexOf(header); return [header, sourceIndex >= 0 ? values[sourceIndex] || '' : '']; })))).filter((memory) => memory.Frequency || memory.Name);
     }
     
     function importCsv(event) {
@@ -1180,7 +1217,6 @@ I guess just let the error happen.*/
             if(addr < CHANNEL_MEMORY_DATA_END){
               const channelIndex = chunkIndex * 4 + channelInChunk;
               const channelData = gt5rDecodeChannelDataFromBlockSegment(channelSubarray);
-              console.log(channelIndex, "0x"+addr.toString(16),channelData);
               if (!channelData) continue;
 
               const headerToChannelData = []
@@ -1189,18 +1225,21 @@ I guess just let the error happen.*/
                 // rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan
                 const tr = document.querySelector(`[data-location="${channelIndex}"]`);
                 const frequencyField = tr?.querySelector('[data-field="Frequency"]');
-                if (frequencyField) frequencyField.value = gt5rFreq(channelData.rxRaw);
+                if (frequencyField) frequencyField.value = /*gt5rFreq(*/channelData.rxRaw/*)*/;
 
-                const duplexField = tr?.querySelector('[data-field="Duplex"]');
-                if (duplexField) duplexField.value = channelData.duplex;
+                const duplexField = tr?.querySelector('[data-field="rx"]');
+                if (duplexField) duplexField.value =  channelData.rxRaw;
 
-                const offsetField = tr?.querySelector('[data-field="Offset"]');
-                if (offsetField) offsetField.value = gt5rFreqOffset(channelData.offset);
+                const offsetField = tr?.querySelector('[data-field="tx"]');
+                if (offsetField) offsetField.value =  channelData.txRaw;
 
-                const toneField = tr?.querySelector('[data-field="Tone"]');
-                if (toneField) toneField.value = channelData.tmode;
+                const rxToneField = tr?.querySelector('[data-field="rxtoneVal"]');
+                if (rxToneField) rxToneField.value = channelData.rxtoneVal;
 
-                const rToneFreqField = tr?.querySelector('[data-field="rToneFreq"]');
+                const txToneField = tr?.querySelector('[data-field="txtoneVal"]');
+                if (txToneField) txToneField.value = channelData.txtoneVal;
+
+               /* const rToneFreqField = tr?.querySelector('[data-field="rToneFreq"]');
                 if (rToneFreqField) rToneFreqField.value = channelData.rTone?.toFixed(1) ?? '';
 
                 const cToneFreqField = tr?.querySelector('[data-field="cToneFreq"]');
@@ -1217,15 +1256,15 @@ I guess just let the error happen.*/
 
                 const CrossModeField = tr?.querySelector('[data-field="CrossMode"]');
                 if (CrossModeField) CrossModeField.value = channelData.crossMode;
+*/
+                const ModeField = tr?.querySelector('[data-field="wide"]');
+                if (ModeField) ModeField.checked = !!channelData.wide;
 
-                const ModeField = tr?.querySelector('[data-field="Mode"]');
-                if (ModeField) ModeField.value = channelData.wide ? 'FM' : 'NFM';
+                const SkipField = tr?.querySelector('[data-field="scan"]');
+                if (SkipField) SkipField.checked = !!channelData.scan;
 
-                const SkipField = tr?.querySelector('[data-field="Skip"]');
-                if (SkipField) SkipField.value = channelData.scan ? '' : 'S';
-
-                const PowerField = tr?.querySelector('[data-field="Power"]');
-                if (PowerField) PowerField.value = channelData.lowpower === 1 ? 'Low' : 'High';
+                const PowerField = tr?.querySelector('[data-field="lowpower"]');
+                if (PowerField) PowerField.checked = !!channelData.lowpower;
               }
 
             } else if (addr >= CHANNEL_MEMORY_NAMES_START) {
@@ -1234,8 +1273,7 @@ I guess just let the error happen.*/
               if (!nameData) continue;
 
               const tr = document.querySelector(`[data-location="${channelIndex}"]`);
-              const nameField = tr?.querySelector('[data-field="Name"]');
-              console.log(channelIndex, "0x"+addr.toString(16), nameData, tr, nameField);
+              const nameField = tr?.querySelector('[data-field="name"]');
               if (nameField) nameField.value = nameData ? nameData.trim() : '';
             }
 
