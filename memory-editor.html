@@ -432,6 +432,9 @@
     tr.hidden {
       display: none;
     }
+    tr.disabled {
+      background-color: var(--tertiary-hover);
+    }
 
     tr[row-selected] td {
       background: var(--canvas);
@@ -815,7 +818,7 @@ let visible = 0;
             }
           }
         </style>
-        <form id="gt5rDecodeSettings">
+        <form id="gt5rSettingsForm">
         <table id="radio-settings-new" class="">
           <thead>
             <tr>
@@ -1191,16 +1194,16 @@ let visible = 0;
               <td>00.000-69.99 in 10kHz steps<input list="offset-values" name="settings-26" type="number" min="0" max="6999" step="1" value="0" aria-label="Frequency shift amount in MHz"></td>
               <td>Specifies the difference between the TX and RX frequencies. The RX frequency is the base and the amount set here will be the offset frequency for the TX frequency</td>
             </tr>
-            <tr id="settings-27">
+            <tr id="settings-27" class="disabled">
               <td>27</td>
               <td>MEM-CH - Store a Memory Channel</td>
-              <td>000-127<input name="settings-27" type="number" min="0" max="127" step="1" value="0" aria-label="Memory channel to store"></td>
+              <td>000-127</td>
               <td>This menu is used to either create new or modify existing channels (0 through 127) so that they can be accessed from MR/Channel Mode.</td>
             </tr>
-            <tr id="settings-28">
+            <tr id="settings-28" class="disabled">
               <td>28</td>
               <td>DEL-CH - Delete a Memory Channel</td>
-              <td>000-127<input name="settings-28" type="number" min="0" max="127" step="1" value="0" aria-label="Memory channel to delete"></td>
+              <td>000-127</td>
               <td>This menu is used to delete the programmed information for the selected channel (0 through 127) so it can be programmed again or be left empty.</td>
             </tr>
             <tr id="settings-29">
@@ -1314,12 +1317,12 @@ let visible = 0;
                 </td>
               <td>Sends an end-of-transmission tone to the other stations that the transmission has ended.</td>
             </tr>
-            <tr id="settings-40">
+            <tr id="settings-40" class="disabled">
               <td>40</td>
               <td>RESET - Restore Defaults</td>
               <td>
-                <label><input type="radio" name="settings-40" value="0">VFO [0]</label>
-                <label><input type="radio" name="settings-40" value="1">ALL [1]</label>
+                <label><input type="radio" name="settings-40" value="0" disabled>VFO [0]</label>
+                <label><input type="radio" name="settings-40" value="1" disabled>ALL [1]</label>
               </td>
               <td>Resets the radio to factory defaults, with some exceptions.</td>
             </tr>
@@ -2070,15 +2073,21 @@ I guess just let the error happen.*/
     }
 
     function setControlValue(name, value) {
-      const form = document.querySelector('#gt5rDecodeSettings');
+      const form = document.querySelector('#gt5rSettingsForm');
       form.querySelectorAll(`[name="${name}"], #${name}`).forEach((control) => {
         if (control.type === 'radio') control.checked = control.value === String(value);
         else control.value = String(value);
       });
     }
 
+    /**
+     * Decode the settings from a GT-5R radio data chunk.
+     * @param {Uint8Array} chunk - The raw data chunk from the radio.
+     * @param {number} baseAddress - The base address of the chunk.
+     * @returns {void}
+     */
     function gt5rDecodeSettings(chunk, baseAddress) {
-      //the settings(excluding ani) start at 0x0E20 (0x0E28-0x8) which is on a 64-byte boundary and should be read in one chunk since it is less than 64 bytes
+      //the settings(excluding some separately stored fields) start at 0x0E20 (0x0E28-0x8) spans a 64-byte boundary and should be read in two chunks since it is less than 64 bytes
       const settingsStart = 0x0e20;
       const settingsEnd = settingsStart + 46;
       const chunkEnd = baseAddress + chunk.length;
@@ -2086,12 +2095,18 @@ I guess just let the error happen.*/
       const settingsChunkEnd = Math.min(settingsEnd, chunkEnd);
       const hasSettings = settingsChunkStart < settingsChunkEnd;
       
-      if (!hasSettings) return false;
+      if (!hasSettings) return;
 
       const firstSetting = Math.max(0, settingsChunkStart - settingsStart);
       const lastSetting = Math.min(41, settingsChunkEnd - settingsStart);
       for (let index = firstSetting; index < lastSetting; index += 1) {
+        if ([10,11,12,13].includes(index)) continue; // {T/R}-{DCS/CTCSS}stored separatly
         if (index === 15) continue; // ani is stored separately
+        if (index === 17) continue; // PTTID a/b is stored separately
+        if (index === 20) continue; // PTT-LT stored separately
+        if (index === 26) continue; // OFFSET stored separately
+        if (index === 27 || index === 28) continue; // only works on device
+        if (index === 40) continue; // rogerrx is not used on GT-5R, and field 40 only works on device
         const name = `settings-${index}`;
         let value = chunk[settingsStart + index - baseAddress];
         if (index === 10 || index === 12) value = value === 0 ? 0 : String(value).padStart(3, '0');
@@ -2103,11 +2118,57 @@ I guess just let the error happen.*/
         console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting ${name} = ${value}`);
       }
 
+      // TODO: handle indices 40+ since they are some of them have values?
+      // and not in a numbered menu item.
+      // looks like 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x08, 0x00 
+      let value40 = chunk[settingsStart + 40 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-40 = ${value40} rogerRX`);
+      // ALways 1?
+      
+      let value41 = chunk[settingsStart + 41 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-41 = ${value41} tdrch`);
+      
+      let value42 = chunk[settingsStart + 42 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-42 = ${value42} packed`);
+      const displayab = (value42 & 0b10000000) >> 7;
+      const someFlag  = (value42 & 0b01100000) >> 5;
+      const fmradio   = (value42 & 0b00010000) >> 4;
+      const alarm     = (value42 & 0b00001000) >> 3;
+      const unknown   = (value42 & 0b00000100) >> 2;
+      const reset     = (value42 & 0b00000010) >> 1;
+      const menu      = (value42 & 0b00000001) >> 0;
+      console.log(`displayab: ${displayab}, someFlag: ${someFlag}, fmradio: ${fmradio}, alarm: ${alarm}, reset: ${reset}, menu: ${menu}`);
+      
+      let value43 = chunk[settingsStart + 43 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-43 = ${value43} packed2`);
+      const unknown43 = (value43 & 0b11111100) >> 2; // placeholder for unknown bits in value43
+      const singleptt = (value43 & 0b00000010) >> 1; // placeholder for single PTT bit in value43
+      const vfomrlock = (value43 & 0b00000001); // placeholder for VFO MR lock bit in value43
+      console.log(`unknown43: ${unknown43}, singleptt: ${singleptt}, vfomrlock: ${vfomrlock}`);
+      
+      let value44 = chunk[settingsStart + 44 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-44 = ${value44} workmode`);
+      
+      let value45 = chunk[settingsStart + 45 - baseAddress]; // keylock
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-45 = ${value45} keylock`);
+      
+      // Byte after settings end
+      let value46 = chunk[settingsStart + 46 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-46 = ${value46} post-settings`);
+      const postSettingsFlag = (value46 & 0b10000000) >> 7; // placeholder for post-settings flag in value46
+      const remaining      = value46 & 0b01111111; // placeholder for another flag in value46
+      console.log(`postSettingsFlag: ${postSettingsFlag}, remaining: ${remaining}`);
+
+      let value47 = chunk[settingsStart + 47 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-47 = ${value47} post settings 2`);
+      
+      let value48 = chunk[settingsStart + 48 - baseAddress];
+      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-48 = ${value48} should be 0xFF`);
+
       const status = document.querySelector('#radio-settings-status');
       status.textContent = chunkEnd >= settingsEnd
         ? 'Settings loaded from the GT-5R.'
         : 'Reading settings from the GT-5R...';
-      return true;
     }
 
     /**
