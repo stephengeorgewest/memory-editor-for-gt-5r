@@ -42,12 +42,20 @@
     const PTTID_START = 0x0b00;// PTTID is 16bits at 0xb00 (0x0b08-0x8), repeated 15 times up to half of 0x0BC0
     const ANI_START = 0x0C80;// ani is 5 bytes? at 0x0cb2 within this struct(0x0C88-0x8), currently set to "80808" on the device
     const SETTINGS_START = 0x0E00; /// start of the settings memory block settings are split between 2 chunks
+    const WM_CHANNEL_START = 0x0E76; // Workmode channel start
     const VFO_MEMORY_START = 0x0F00; // start of the VFO memory block, should be 2 of them in the block
+    const FM_PRESETS_START = 0x0F4E; // ?
     const CHANNEL_MEMORY_NAME_SIZE = 0x10;
     const CHANNEL_MEMORY_NAME_REAL_SIZE = 0x07;
     const CHANNEL_MEMORY_NAMES_START = 0x1000;
     const CHANNEL_MEMORY_END = 0x1800;
-    const POWERON_MESSAGE_START = 0x1810;
+    const POWERON_MESSAGE_START = 0x1810; // containes sixpoweron_msg 2x7char and poweron_msg 2x7char (32 bytes?)
+    const FIRMWARE_MSG_START = 0x1830; // firmware message start
+    const SQELCH_NEW_START = 0x18A0; // squelch new message start
+    const SQELCH_OLD_START = 0x18E0; // squelch old message start
+    const SQELCH_OLD_END = 0x18FF; // squelch old message end
+    const LIMITS_NEW_START = 0x1900; // limits new message start
+    const LIMITS_OLD_START = 0x1910; // limits new message end
     const OTHER_MEMORY_START = 0x1E80;
     const OTHER_MEMORY_END = 0x1FC0;
     // the rest of the settings start at 0x0E20 (0x0E28-0x8)
@@ -638,10 +646,6 @@
       .toolbar {
         align-items: flex-start;
         flex-direction: column;
-      }
-
-      .actions {
-        width: 100%;
       }
 
       .button {
@@ -1300,13 +1304,16 @@ let visible = 0;
             <tr id="settings-27" class="disabled">
               <td>27</td>
               <td>MEM-CH - Store a Memory Channel</td>
-              <td>000-127</td>
+              <td>000-127
+                <input name="mem-ch-a" type="number" min="0" max="127" step="1" aria-label="Memory channel number" disabled />
+              </td>
               <td>This menu is used to either create new or modify existing channels (0 through 127) so that they can be accessed from MR/Channel Mode.</td>
             </tr>
             <tr id="settings-28" class="disabled">
               <td>28</td>
               <td>DEL-CH - Delete a Memory Channel</td>
-              <td>000-127</td>
+              <td>000-127
+                <input name="mem-ch-b" type="number" min="0" max="127" step="1" aria-label="Memory channel number" disabled /></td>
               <td>This menu is used to delete the programmed information for the selected channel (0 through 127) so it can be programmed again or be left empty.</td>
             </tr>
             <tr id="settings-29">
@@ -1439,11 +1446,10 @@ let visible = 0;
             </tr>
           </tbody>
           <thead>
-            <tr><th colspan="4">Additional Settings</th></tr>
+            <tr><th colspan="4">Additional Settings (without menu entries)</th></tr>
           </thead>
           <tbody id="settings-vfo-a">
             <tr>
-              <!-- TODO: Consider putting it above the other settingcs for clarity -->
               <td></td>
               <td>Frequency</td>
               <td>
@@ -1457,6 +1463,60 @@ let visible = 0;
                 </table>
               </td>
               <td></td>
+            </tr>
+            <tr>
+              <td>42</td>
+              <td>Display A/B</td>
+              <td>
+                <label><input type="radio" name="settings-42-displayab" value="0">[0] A</label>
+                <label><input type="radio" name="settings-42-displayab" value="1">[1] B</label>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>42</td>
+              <td>FM Broadcast</td>
+              <td>
+                <label><input type="radio" name="settings-42-fmradio" value="0">[0] OFF</label>
+                <label><input type="radio" name="settings-42-fmradio" value="1">[1] ON</label>
+              </td>
+              <td>Allows or blocks use of the 64-408 MHZ broadcast reciever from the radio's CALL button.</td>
+            </tr>
+            <tr>
+              <td>42</td>
+              <td>Reset Menu</td>
+              <td>
+                <label><input type="radio" name="settings-42-reset" value="0">[0] OFF</label>
+                <label><input type="radio" name="settings-42-reset" value="1">[1] ON</label>
+              </td>
+              <td>Controls whether the radio's front-panel RESET menu is availible. This does not reset the radio by itself</td>
+            </tr>
+            <tr>
+              <td>42</td>
+              <td>All Menus</td>
+              <td>
+                <label><input type="radio" name="settings-42-menu" value="0">[0] OFF</label>
+                <label><input type="radio" name="settings-42-menu" value="1">[1] ON</label>
+              </td>
+              <td>Controls access to the full front-panel menu. Disabling it can prevent users from changing programmed settings on the radio.</td>
+            </tr>
+            <tr>
+              <td>44</td>
+              <td>Workmode</td>
+              <td>
+                <label><input type="radio" name="settings-44-workmode" value="0">[0] Frequency</label>
+                <label><input type="radio" name="settings-44-workmode" value="1">[1] Channel</label>
+              </td>
+              <td>Selects the operating mode used at startup. Frequency (VFO)  mode for direct tuning, or Channel (MR) mode for programmed memories.</td>
+            </tr>
+            <tr>
+              <td>45</td>
+              <td>Keylock</td>
+              <td>
+                <label><input type="radio" name="settings-45-keylock" value="0">[0] Off</label>
+                <label><input type="radio" name="settings-45-keylock" value="1">[1] On</label>
+              </td>
+              <td>Sets the current keypad-lock state. Hold the # key on the radio to lock or unlock the keyboard.</td>
             </tr>
           </tbody>
         </table>
@@ -2087,6 +2147,10 @@ I guess just let the error happen.*/
                 visibleChannels();
               }
             }
+          } else if (PTTID_START <= addr && addr < PTTID_START + CHUNK_SIZE) {
+            console.log('PTTID chunk address:', addr.toString(16));
+            console.log(chunk);
+            // TODO
           } else if(addr === ANI_START) {
             const aniCodeStart = 0x0CAA;
             const aniCodeEnd = aniCodeStart + 5;
@@ -2095,9 +2159,18 @@ I guess just let the error happen.*/
               .map((byte) => (byte === 0xff ? '' : String(byte)))
               .join('');
             setControlValue('settings-15', aniCode);
-            console.log('ANI chunk address:', addr.toString(16), aniCodeStart.toString(16), aniCode);
+            //console.log('ANI chunk address:', addr.toString(16), aniCodeStart.toString(16), aniCode);
           } else if (addr === SETTINGS_START || addr === SETTINGS_START + CHUNK_SIZE) {
             gt5rDecodeSettings(chunk, addr);
+          } else if (WM_CHANNEL_START <= addr && addr <= (WM_CHANNEL_START + CHUNK_SIZE)) {
+            //console.log('WM chunk address:', addr.toString(16));
+            //console.log(chunk);
+            // Always 127?
+            const dataStartIndex = addr - WM_CHANNEL_START;
+            const mrChannelData_A = chunk[dataStartIndex + 0] & 0b01111111;
+            const mrChannelData_B = chunk[dataStartIndex + 1] & 0b01111111;
+            setControlValue('mem-ch-a', mrChannelData_A);
+            setControlValue('mem-ch-b', mrChannelData_B);
           } else if (addr === VFO_MEMORY_START) {
             gt5rDecodeVfoTones(chunk);
           } else if (addr >= CHANNEL_MEMORY_NAMES_START) {
@@ -2260,21 +2333,21 @@ I guess just let the error happen.*/
         if (index === 25) value &= 0x03;
         if (index === 32 && value > 2) value = 1;
         setControlValue(name, value);
-        console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting ${name} = ${value}`);
+        //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting ${name} = ${value}`);
       }
 
       // TODO: handle indices 40+ since they are some of them have values?
       // and not in a numbered menu item.
       // looks like 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x08, 0x00 
       let value40 = chunk[settingsStart + 40 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-40 = ${value40} rogerRX`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-40 = ${value40} rogerRX`);
       // ALways 1?
       
       let value41 = chunk[settingsStart + 41 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-41 = ${value41} tdrch`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-41 = ${value41} tdrch`);
       
       let value42 = chunk[settingsStart + 42 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-42 = ${value42} packed`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-42 = ${value42} packed`);
       const displayab = (value42 & 0b10000000) >> 7;
       const someFlag  = (value42 & 0b01100000) >> 5;
       const fmradio   = (value42 & 0b00010000) >> 4;
@@ -2282,33 +2355,42 @@ I guess just let the error happen.*/
       const unknown   = (value42 & 0b00000100) >> 2;
       const reset     = (value42 & 0b00000010) >> 1;
       const menu      = (value42 & 0b00000001) >> 0;
-      console.log(`displayab: ${displayab}, someFlag: ${someFlag}, fmradio: ${fmradio}, alarm: ${alarm}, reset: ${reset}, menu: ${menu}`);
+      setControlValue('settings-42-displayab', displayab);
+      setControlValue('settings-42-fmradio', fmradio);
+      //setControlValue('settings-42-alarm', alarm);
+      setControlValue('settings-42-unknown', unknown);
+      setControlValue('settings-42-reset', reset);
+      setControlValue('settings-42-menu', menu);
+      //console.log(`displayab: ${displayab}, someFlag: ${someFlag}, fmradio: ${fmradio}, alarm: ${alarm}, reset: ${reset}, menu: ${menu}`);
+
       
       let value43 = chunk[settingsStart + 43 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-43 = ${value43} packed2`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-43 = ${value43} packed2`);
       const unknown43 = (value43 & 0b11111100) >> 2; // placeholder for unknown bits in value43
-      const singleptt = (value43 & 0b00000010) >> 1; // placeholder for single PTT bit in value43
-      const vfomrlock = (value43 & 0b00000001); // placeholder for VFO MR lock bit in value43
-      console.log(`unknown43: ${unknown43}, singleptt: ${singleptt}, vfomrlock: ${vfomrlock}`);
+      const singleptt = (value43 & 0b00000010) >> 1;
+      const vfomrlock = (value43 & 0b00000001); // VFO MR lock
+      //console.log(`unknown43: ${unknown43}, singleptt: ${singleptt}, vfomrlock: ${vfomrlock}`);
       
       let value44 = chunk[settingsStart + 44 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-44 = ${value44} workmode`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-44 = ${value44} workmode`);
+      setControlValue('settings-44-workmode', (value44 & 0b00000001));
       
       let value45 = chunk[settingsStart + 45 - baseAddress]; // keylock
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-45 = ${value45} keylock`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-45 = ${value45} keylock`);
+      setControlValue('settings-45-keylock', (value45 & 0b00000001));
       
       // Byte after settings end
       let value46 = chunk[settingsStart + 46 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-46 = ${value46} post-settings`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-46 = ${value46} post-settings`);
       const postSettingsFlag = (value46 & 0b10000000) >> 7; // placeholder for post-settings flag in value46
       const remaining      = value46 & 0b01111111; // placeholder for another flag in value46
-      console.log(`postSettingsFlag: ${postSettingsFlag}, remaining: ${remaining}`);
+      //console.log(`postSettingsFlag: ${postSettingsFlag}, remaining: ${remaining}`);
 
       let value47 = chunk[settingsStart + 47 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-47 = ${value47} post settings 2`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-47 = ${value47} post settings 2`);
       
       let value48 = chunk[settingsStart + 48 - baseAddress];
-      console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-48 = ${value48} should be 0xFF`);
+      //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-48 = ${value48} should be 0xFF`);
 
       const status = document.querySelector('#radio-settings-status');
       status.textContent = chunkEnd >= settingsEnd
@@ -2381,7 +2463,7 @@ I guess just let the error happen.*/
         setControlValue(`vfo-${vfo}-widenarr`, widenarr);
         const txpower3 = chunk[index] & 0b00000011;
 
-        console.log(chunk, `frequency: ${frequency}, offset: ${offset.join("")}, rxTone: ${rxTone}, txTone: ${txTone}, band: ${band}, sftd: ${sftd}, scode: ${scode}, step: ${step}, txpower: ${txpower}, widenarr: ${widenarr}, txpower3: ${txpower3}`);
+        //console.log(chunk, `frequency: ${frequency}, offset: ${offset.join("")}, rxTone: ${rxTone}, txTone: ${txTone}, band: ${band}, sftd: ${sftd}, scode: ${scode}, step: ${step}, txpower: ${txpower}, widenarr: ${widenarr}, txpower3: ${txpower3}`);
       });
     }
 
