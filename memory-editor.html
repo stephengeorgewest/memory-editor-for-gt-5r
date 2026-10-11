@@ -42,6 +42,7 @@
     const PTTID_START = 0x0b00;// PTTID is 16bits at 0xb00 (0x0b08-0x8), repeated 15 times up to half of 0x0BC0
     const ANI_START = 0x0C80;// ani is 5 bytes? at 0x0cb2 within this struct(0x0C88-0x8), currently set to "80808" on the device
     const SETTINGS_START = 0x0E00; /// start of the settings memory block settings are split between 2 chunks
+    const VFO_MEMORY_START = 0x0F00; // start of the VFO memory block, should be 2 of them in the block
     const CHANNEL_MEMORY_NAME_SIZE = 0x10;
     const CHANNEL_MEMORY_NAME_REAL_SIZE = 0x07;
     const CHANNEL_MEMORY_NAMES_START = 0x1000;
@@ -148,6 +149,13 @@
 
     body {
       margin: 0;
+    }
+    .floatread-serial {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1000;
+      padding: 0;
     }
 
     .masthead {
@@ -513,6 +521,11 @@
       vertical-align: top;
     }
 
+    td > p {
+      text-indent: -1rem;
+      margin-left: 1rem;
+    }
+
     label:has(> input[type="checkbox"]) {
       cursor: pointer;
     }
@@ -582,7 +595,6 @@
 
     #radio-settings td:first-child {
       color: var(--heading-ink);
-      min-width: 15rem;
     }
 
     #radio-settings .setting-category td {
@@ -591,6 +603,10 @@
       font-weight: 500;
       letter-spacing: .08em;
       padding: .6rem .4rem;
+    }
+
+    #radio-settings tbody.collapsed td {
+      display: none;
     }
 
     .serial-log {
@@ -636,7 +652,76 @@
   </style>
 </head>
 
+<datalist id="ToneValue-datalist">
+  <option value="0">0 - Clear</option>
+  <script>
+    GT5R_DCS_CODE_TABLE.forEach((code) => {
+      document.write(`<option value="${code.value}">DCS - ${code.number} - ${code.code}</option>`);
+    });
+    GT5R_CTCSS_CODE_TABLE.forEach((code) => {
+      document.write(`<option value="${code.value}">CTCSS - ${code.number} - ${code.code}</option>`);
+    });
+  </script>
+</datalist>
+
+<datalist id="rxFrequency-datalist">
+  <option value="166666665">unset - same as rx</option>
+  <script>
+    RX_FREQUENCIES.forEach(([lowfreq, highfreq], index) => {
+      for(let i=lowfreq; i <= highfreq; i += 250)
+        document.write(`<option value="${i}">${index === 0 ? 'VHF' : 'UHF'} - ${i/100000} MHz</option>`);
+    });
+  </script>
+</datalist>
+
+<datalist id="txFrequency-datalist">
+  <option value="166666665">unset - same as rx</option>
+  <script>
+    TX_FREQUENCIES.forEach(([lowfreq, highfreq], band) => {
+      for(let frequency=lowfreq; frequency <= highfreq; frequency += 250)
+        document.write(`<option value="${frequency}">${band === 0 ? 'VHF' : 'UHF'} - ${frequency/100000} MHz</option>`);
+    });
+  </script>
+</datalist>
+
+<datalist id="tot-timeouts">
+  <script>
+    // const totTimeouts = [0, 5, 10, 15, 20, 25, 30, 35, 39];
+    const datalist = document.getElementById('tot-timeouts');
+    [...Array(40)].forEach((_,index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.innerText = `${(index + 1) * 15} seconds [${index}]`;
+      datalist.appendChild(option);
+    });
+  </script>
+</datalist>
+
+<datalist id="StepValue-datalist">
+  <option value="0">2.5kHz [0]</option>
+  <option value="1">5.0kHz [1]</option>
+  <option value="2">6.25kHz [2]</option>
+  <option value="3">10.0kHz [3]</option>
+  <option value="4">12.5kHz [4]</option>
+  <option value="5">20.0kHz [5]</option>
+  <option value="6">25.0kHz [6]</option>
+  <option value="7">50.0kHz [7]</option>
+</datalist>
+
+<datalist id="settings-tuning-steps">
+  <option value="0">0: 2.5 kHz</option>
+  <option value="1">1: 5.0 kHz</option>
+  <option value="2">2: 6.25 kHz</option>
+  <option value="3">3: 10.0 kHz</option>
+  <option value="4">4: 12.5 kHz</option>
+  <option value="5">5: 20.0 kHz</option>
+  <option value="6">6: 25.0 kHz</option>
+  <option value="7">7: 50.0 kHz</option>
+</datalist>
+
 <body>
+  <button id="read-serial-floating" class="floatread-serial" type="button">⤓</button>
+
   <header class="masthead">
     <div>
       <p class="kicker">A small</p>
@@ -652,7 +737,7 @@
         <p id="memory-status" role="status">Editable channels ready for export.</p>
       </div>
       <button id="write-serial" class="primary" disabled>Write to GT-5R</button>
-      <button id="read-serial" class="secondary" type="button">Read from GT-5R</button>
+      <button id="read-serial" class="secondary read-serial" type="button">Read from GT-5R</button>
     </section>
     <section class="table-section">
       <div class="table-heading">
@@ -676,38 +761,6 @@
         </div>
       </section>
       <section class="grid-shell">
-        <datalist id="ToneValue-datalist">
-          <option value="0">0 - Clear</option>
-          <script>
-            GT5R_DCS_CODE_TABLE.forEach((code) => {
-              document.write(`<option value="${code.value}">DCS - ${code.number} - ${code.code}</option>`);
-            });
-            GT5R_CTCSS_CODE_TABLE.forEach((code) => {
-              document.write(`<option value="${code.value}">CTCSS - ${code.number} - ${code.code}</option>`);
-            });
-          </script>
-        </datalist>
-
-        <datalist id="rxFrequency-datalist">
-          <option value="166666665">unset - same as rx</option>
-          <script>
-            RX_FREQUENCIES.forEach(([lowfreq, highfreq], index) => {
-              for(let i=lowfreq; i <= highfreq; i += 250)
-                document.write(`<option value="${i}">${index === 0 ? 'VHF' : 'UHF'} - ${i/100000} MHz</option>`);
-            });
-          </script>
-        </datalist>
-
-        <datalist id="txFrequency-datalist">
-          <option value="166666665">unset - same as rx</option>
-          <script>
-            TX_FREQUENCIES.forEach(([lowfreq, highfreq], band) => {
-              for(let frequency=lowfreq; frequency <= highfreq; frequency += 250)
-                document.write(`<option value="${frequency}">${band === 0 ? 'VHF' : 'UHF'} - ${frequency/100000} MHz</option>`);
-            });
-          </script>
-        </datalist>
-        
         <table>
           <thead>
             <tr>
@@ -797,29 +850,31 @@ let visible = 0;
       </div>
       <section class="grid-shell">
         <style>
-          #radio-settings, #radio-settings-new {
+          #radio-settings {
             width: 100%;
             border-collapse: collapse;
           }
-          #radio-settings th, #radio-settings td,
-          #radio-settings-new th, #radio-settings-new td {
+          #radio-settings th, #radio-settings td {
             padding: 8px;
             text-align: left;
             width: inherit;
           }
           #radio-settings td,
-          th, #radio-settings-new td {
+          th {
             white-space: inherit;
             label{
               display: block;
               input[type="radio"] {
                 width: initial;
+                accent-color: var(--leaf);
               }
             }
+
+            table { width: 100%; }
           }
         </style>
         <form id="gt5rSettingsForm">
-        <table id="radio-settings-new" class="">
+        <table id="radio-settings">
           <thead>
             <tr>
               <th>Menu</th>
@@ -827,8 +882,9 @@ let visible = 0;
               <th>Setting</th>
               <th>Description</th>
             </tr>
+            <tr><td colspan="4"><div class="collapse-indicator" data-collapse-target="radio-settings-body">></div></td></tr>
           </thead>
-          <tbody>
+          <tbody id="radio-settings-body">
             <tr id="settings-0">
               <td>0</td>
               <td>SQL - Squelch level</td>
@@ -855,17 +911,15 @@ let visible = 0;
             <tr id="settings-1">
               <td>1</td>
               <td>Tuning step</td>
-              <td><datalist id="settings-tuning-steps">
-                <option value="0">0: 2.5 kHz</option>
-                <option value="1">1: 5.0 kHz</option>
-                <option value="2">2: 6.25 kHz</option>
-                <option value="3">3: 10.0 kHz</option>
-                <option value="4">4: 12.5 kHz</option>
-                <option value="5">5: 20.0 kHz</option>
-                <option value="6">6: 25.0 kHz</option>
-                <option value="7">7: 50.0 kHz</option>
-              </datalist>
-              <input list="settings-tuning-steps" name="settings-1">
+              <td>
+                  <table>
+                    <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                    <tr><td>
+                      <input type="text" list="StepValue-datalist" name="vfo-a-step" />
+                    </td><td>
+                      <input type="text" list="StepValue-datalist" name="vfo-b-step" />
+                    </td></tr>
+                  </table>
               </td>
               <td>
                 <p>Selects the amount of frequency change in VFO/Frequency mode when scanning or pressing the ▲ and ▼ keys.</p>
@@ -875,8 +929,16 @@ let visible = 0;
               <td>2</td>
               <td>TXP - Transmit Power</td>
               <td>
-                <label><input type="radio" name="settings-2" value="0">High [0]</input></label>
-                <label><input type="radio" name="settings-2" value="1">Low [1]</input></label>
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <label><input type="radio" name="vfo-a-txpower" value="0" /> LOW [0]</label>
+                <label><input type="radio" name="vfo-a-txpower" value="1" /> HIGH [1]</label>
+                  </td><td>
+                    <label><input type="radio" name="vfo-b-txpower" value="0" /> LOW [0]</label>
+                <label><input type="radio" name="vfo-b-txpower" value="1" /> HIGH [1]</label>
+                  </td></tr>
+                </table>
               </td>
               <td><p>Selects between HIGH and LOW transmitter power when in Variable Frequency Oscillator (VFO) mode.
                 Use the minimum transmitter power necessary to carry out the desired communications.</p></td>
@@ -916,8 +978,17 @@ let visible = 0;
               <td>5</td>
               <td>WN - Wide band / Narrow band</td>
               <td>
-                <label><input type="radio" name="settings-5" value="0">WIDE [0]</input></label>
-                <label><input type="radio" name="settings-5" value="1">NARR [1]</input></label>
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <style>tr table label{white-space: nowrap;}</style>
+                <label><input type="radio" name="vfo-a-widenarr" value="0">WIDE [0]</input></label>
+                <label><input type="radio" name="vfo-a-widenarr" value="1">NARR [1]</input></label>
+              </td><td>
+                <label><input type="radio" name="vfo-b-widenarr" value="0">WIDE [0]</input></label>
+                <label><input type="radio" name="vfo-b-widenarr" value="1">NARR [1]</input></label>
+              </td></tr>
+                </table>
               </td>
               <td>Wideband (25 kHz bandwidth) or Narrow band (12.5 kHz band-width).</td>
             </tr>
@@ -957,18 +1028,6 @@ let visible = 0;
               <td>9</td>
               <td>TOT - Transmission Time-out Timer</td>
               <td>
-                <datalist id="tot-timeouts">
-                  <script>
-                    const totTimeouts = [0, 5, 10, 15, 20, 25, 30, 35, 39];
-                    const datalist = document.getElementById('tot-timeouts');
-                    [...Array(40)].forEach((_,index) => {
-                      const option = document.createElement('option');
-                      option.value = index;
-                      option.innerText = `${(index + 1) * 15} seconds [${index}]`;
-                      datalist.appendChild(option);
-                    });
-                  </script>
-                </datalist>
                 15[0]-600[39] in 15 second steps (TIMEOUT-15)/15=[n]
                 <input id="settings-9" name="settings-9" type="number" list="tot-timeouts" aria-label="TOT timeout index"></td>
               <td>
@@ -978,26 +1037,12 @@ let visible = 0;
                 as well as preventing battery depletion.
               </td>
             </tr>
-<datalist id="dcs-tone-table" name="settings-10" data-tone-table="dcs"><option value="0">OFF [0]</option></datalist>
-<datalist id="ctcss-tone-table" name="settings-11" data-tone-table="ctcss"><option value="0">OFF [0]</option></datalist>
-
-<script>
-      document.querySelectorAll('[data-tone-table]').forEach((select) => {
-        const codeTable = select.dataset.toneTable === 'dcs' ? GT5R_DCS_CODE_TABLE : GT5R_CTCSS_CODE_TABLE;
-        codeTable.forEach(({ number, code, value }) => {
-          const option = document.createElement('option');
-          option.value = number;
-          option.textContent = `${code} [${number}]`;
-          select.appendChild(option);
-        });
-      });
-</script>
             <tr id="settings-10">
               <td>10</td>
               <td>R-DCS - Receiver DCS</td>
               <td>
                 OFF[0] see DCS Table in Appendix C
-<input list="dcs-tone-table" id="settings-10" name="settings-10-input" aria-label="R-DCS input">
+                <p><a href="#settings-11">Shared input with R-CTCS</a></p>
               </td>
               <td>
                 Mutes the speaker of the transceiver in the absence of a specific low-level digital signal. 
@@ -1010,7 +1055,14 @@ let visible = 0;
               <td>R-CTCS - Receiver CTCSS</td>
               <td>
                 OFF[0] see CTCSS Table in Appendix C
-  <input list="ctcss-tone-table" name="settings-11" aria-label="R-CTCS input">
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <input type="text" name="vfo-a-rxtone" list="ToneValue-datalist" aria-label="RX-Tone input" />
+                  </td><td>
+                    <input type="text" name="vfo-b-rxtone" list="ToneValue-datalist" aria-label="RX-Tone input" />
+                  </td></tr>
+                </table>
               </td>
               <td>
                 Mutes the speaker of the transceiver in the absence of a specific and continuous sub-audible signal. 
@@ -1023,7 +1075,8 @@ let visible = 0;
               <td>T-DCS - Transmitter DCS</td>
               <td>
                 OFF[0] see DCS Table in Appendix C
-                <input list="dcs-tone-table" id="settings-12" name="settings-12" aria-label="T-DCS input"></td>
+                <p><a href="#settings-13">Shared input with T-CTCS</a></p>
+              </td>
               <td>Transmits a specific low-level digital signal to unlock the squelch of a distant receiver (usually a repeater).</td>
             </tr>
             <tr id="settings-13">
@@ -1031,7 +1084,14 @@ let visible = 0;
               <td>T-CTCS - Transmitter CTCSS</td>
               <td>
                 OFF[0] see CTCSS Table in Appendix C
-                <input list="ctcss-tone-table" id="settings-13" name="settings-13" aria-label="T-CTCS input" />
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <input type="text" name="vfo-a-txtone" list="ToneValue-datalist" aria-label="TX-CTCS input" />
+                  </td><td>
+                    <input type="text" name="vfo-b-txtone" list="ToneValue-datalist" aria-label="TX-CTCS input" />
+                  </td></tr>
+                </table>
               </td>
               <td>Transmits a specific and continuous sub-audible signal to unlock the squelch of a distant receiver (usually a repeater).</td>
             </tr>
@@ -1045,7 +1105,7 @@ let visible = 0;
                 </td>
               <td>Sets the radio's voice prompts to the language set when pressing a button.</td>
             </tr>
-            <tr id="settings-16">
+            <tr id="settings-15">
               <td>15</td>
               <td>ANI-ID - Automatic Number ID</td>
               <td><input id="settings-15" name="settings-15" type="text" inputmode="numeric" value="" aria-label="ANI code programmed by computer software"></td>
@@ -1056,7 +1116,7 @@ let visible = 0;
               <td>DTMFST - DTMF Side Tone of Transmit Code</td>
               <td><label id="settings-16">
                 <input name="settings-16" type="radio" value="0">OFF [0]: no DTMF Side Tones are heard.</input></label>
-                <label><input name="settings-16" type="radio" value="1">ANI-ST [1]: manual does not indicate this setting, but it is exists on the handset between DT-ST and DT+ANI.</input></label>
+                <label><input name="settings-16" type="radio" value="1">ANI-ST [1?]: manual does not indicate this setting, but it is exists on the handset between DT-ST and DT+ANI.</input></label>
                 <label><input name="settings-16" type="radio" value="2">DT-ST [2]:  Side Tones are heard only from automatically keyed DTMF tones</input></label>
                 <label><input name="settings-16" type="radio" value="3">DT+ANI [3]: All DTMF Side Tones are heard</input></label>
               </td>
@@ -1067,26 +1127,55 @@ let visible = 0;
             <tr id="settings-17">
               <td>17</td>
               <td>S-CODE - Signal Code</td>
-              <td>TODO<select id="settings-17" name="settings-17" disabled>
-                <option value="0">1 [0]</option>
-                <option value="1">2 [1]</option>
-                <option value="2">3 [2]</option>
-                <option value="3">4 [3]</option>
-                <option value="4">5 [4]</option>
-                <option value="5">6 [5]</option>
-                <option value="6">7 [6]</option>
-                <option value="7">8 [7]</option>
-                <option value="8">9 [8]</option>
-                <option value="9">10 [9]</option>
-                <option value="10">11 [10]</option>
-                <option value="11">12 [11]</option>
-                <option value="12">13 [12]</option>
-                <option value="13">14 [13]</option>
-                <option value="14">15 [14]</option>
-              </select></td>
+              <td>
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr>
+                    <td>
+                      <select name="vfo-a-scode" aria-label="VFO-A Signal Code input">
+                        <option value="0">1</option>
+                        <option value="1">2</option>
+                        <option value="2">3</option>
+                        <option value="3">4</option>
+                        <option value="4">5</option>
+                        <option value="5">6</option>
+                        <option value="6">7</option>
+                        <option value="7">8</option>
+                        <option value="8">9</option>
+                        <option value="9">10</option>
+                        <option value="10">11</option>
+                        <option value="11">12</option>
+                        <option value="12">13</option>
+                        <option value="13">14</option>
+                        <option value="14">15</option>
+                        <option value="15">16</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select name="vfo-b-scode" aria-label="VFO-B Signal Code input">
+                        <option value="0">1</option>
+                        <option value="1">2</option>
+                        <option value="2">3</option>
+                        <option value="3">4</option>
+                        <option value="4">5</option>
+                        <option value="5">6</option>
+                        <option value="6">7</option>
+                        <option value="7">8</option>
+                        <option value="8">9</option>
+                        <option value="9">10</option>
+                        <option value="10">11</option>
+                        <option value="11">12</option>
+                        <option value="12">13</option>
+                        <option value="13">14</option>
+                        <option value="14">15</option>
+                        <option value="15">16</option>
+                      </select>
+                    </td>
+                  </tr>
+                </table>
+              </td>
               <td>
                 Selects one of 15 DTMF codes. The DTMF codes are programmed with computer software and are up to 5 characters/digits each.
-                <!-- Note: this should be 2 fields VFO A PTT-ID, and VFO B PTT-ID under "Work Mode Settings in chirp" -->
               </td>
             </tr>
             <tr id="settings-18">
@@ -1172,26 +1261,40 @@ let visible = 0;
               <td>25</td>
               <td>SFT-D - Frequency Shift Direction</td>
               <td>
-                <label><input type="radio" name="settings-25" value="0">OFF [0]: TX = RX (simplex)</label>
-                <label><input type="radio" name="settings-25" value="1">+ [1]: TX will be shifted higher in frequency than RX frequency.</label>
-                <label><input type="radio" name="settings-25" value="2">- [2]: TX will be shifted lower in frequency than RX frequency.</label>
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <label><input type="radio" name="vfo-a-sftd" value="0" /> Off [0]</label>
+                <label><input type="radio" name="vfo-a-sftd" value="1" /> + [1]</label>
+                <label><input type="radio" name="vfo-a-sftd" value="2" /> - [2]</label>
+                  </td><td>
+<label><input type="radio" name="vfo-b-sftd" value="0" /> Off [0]</label>
+                <label><input type="radio" name="vfo-b-sftd" value="1" /> + [1]</label>
+                <label><input type="radio" name="vfo-b-sftd" value="2" /> - [2]</label>
+                  </td></tr>
+                </table>
               </td>
               <td>
                 <p>Enables access of repeaters in VFO/Frequency mode</p>
+                <p>OFF [0]: TX = RX (simplex)</p>
+                <p>+ [1]: TX will be shifted higher in frequency than RX frequency.</p>
+                <p>- [2]: TX will be shifted lower in frequency than RX frequency.</p>
               </td>
             </tr>
             <tr id="settings-26">
               <td>26</td>
               <td>OFFSET - Frequency Shift Amount</td>
-              <datalist id="offset-values">
-                <script>
-                  for (let i = 0; i <= 6999; i++) {
-                    let value = (i / 100).toFixed(2);
-                    document.write(`<option value="${i}">${value} Mhz</option>`);
-                  }
-                </script>
-              </datalist>
-              <td>00.000-69.99 in 10kHz steps<input list="offset-values" name="settings-26" type="number" min="0" max="6999" step="1" value="0" aria-label="Frequency shift amount in MHz"></td>
+              <td>
+                00.000-69.99 in 10kHz steps
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                <input name="vfo-a-offset" type="number" min="0" max="69.99" step="0.01" aria-label="Frequency shift amount in MHz" />
+                  </td><td>
+                  <input name="vfo-b-offset" type="number" min="0" max="69.99" step="0.01" aria-label="Frequency shift amount in MHz" />
+                  </td></tr>
+                </table>
+              </td>
               <td>Specifies the difference between the TX and RX frequencies. The RX frequency is the base and the amount set here will be the offset frequency for the TX frequency</td>
             </tr>
             <tr id="settings-27" class="disabled">
@@ -1257,8 +1360,16 @@ let visible = 0;
               <td>33</td>
               <td>BAND</td>
               <td>
-                <label><input type="radio" name="settings-33" value="0">VHF [0]</label>
-                <label><input type="radio" name="settings-33" value="1">UHF [1]</label>
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <label><input type="radio" name="vfo-a-band" value="0" />LOW [0]</label>
+                <label><input type="radio" name="vfo-a-band" value="1" />HIGH [1]</label>
+                  </td><td>
+                    <label><input type="radio" name="vfo-b-band" value="0" /> LOW [0]</label>
+                <label><input type="radio" name="vfo-b-band" value="1" /> HIGH [1]</label>
+                  </td></tr>
+                </table>
               </td>
               <td>Displays the band of the currently displayed frequency on the upper A or lower B LCD.</td>
             </tr>
@@ -1326,7 +1437,28 @@ let visible = 0;
               </td>
               <td>Resets the radio to factory defaults, with some exceptions.</td>
             </tr>
-            </tbody>
+          </tbody>
+          <thead>
+            <tr><th colspan="4">Additional Settings</th></tr>
+          </thead>
+          <tbody id="settings-vfo-a">
+            <tr>
+              <!-- TODO: Consider putting it above the other settingcs for clarity -->
+              <td></td>
+              <td>Frequency</td>
+              <td>
+                <table>
+                  <tr><th>VFO-A</th><th>VFO-B</th></tr>
+                  <tr><td>
+                    <input list="rxFrequency-datalist" type="text" name="vfo-a-frequency" />
+                  </td><td>
+                    <input list="rxFrequency-datalist" type="text" name="vfo-b-frequency" />
+                  </td></tr>
+                </table>
+              </td>
+              <td></td>
+            </tr>
+          </tbody>
         </table>
         </form>
       </section>
@@ -1420,6 +1552,13 @@ let visible = 0;
 
       document.querySelectorAll(".collapse-indicator").forEach((section) => section.addEventListener('click', (event) =>{
         event.stopPropagation();
+        if(event.target.dataset.collapseTarget) {
+          const targetId = event.target.dataset.collapseTarget;
+          const targetElement = document.getElementById(targetId);
+          if(targetElement) {
+            targetElement.classList.toggle('collapsed');
+          }
+        }
         event.target.parentElement.parentElement.getAttribute('id');
         event.target.parentElement.parentElement.classList.toggle('collapsed');
       }));
@@ -1465,8 +1604,9 @@ I guess just let the error happen.*/
       });
 
       const readSerialButton = document.querySelector('#read-serial');
-      if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
-      else readSerialButton.addEventListener('click', readFromGt5r);
+      const readSerialFloatingButton = document.querySelector('#read-serial-floating');
+      if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; readSerialFloatingButton.disabled = true; readSerialFloatingButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
+      else { readSerialButton.addEventListener('click', readFromGt5r); readSerialFloatingButton.addEventListener('click', readFromGt5r); }
       document.querySelector('#select-serial-log').addEventListener('change', (event) => {
         const index = Number(event.target.value);
         showSerialLog(index);
@@ -1710,7 +1850,6 @@ I guess just let the error happen.*/
         readSerialButton.style.setProperty('--progress', '0%');
 
         const data = await gt5rDownload(byteReader, (done, total) => {
-          // TODO: can we parse data as we download it?
           const progress = Math.round((done / total) * 100);
           showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#memory");
           readSerialButton.style.setProperty('--progress', `${progress}%`);
@@ -1852,7 +1991,6 @@ I guess just let the error happen.*/
      * @param {number} baseAddress - The base address of the chunk.
      */
     function drawChunk(context, chunk, baseAddress) {
-      //TODO: get chunk of imagedata and write all at once instead of per pixel
       const imageData = context.getImageData(baseAddress/CHUNK_SIZE, CHUNK_SIZE/CHANNEL_SIZE, 1, 1);
       for (let channelIndex = 0; channelIndex < CHUNK_SIZE/CHANNEL_SIZE; channelIndex++)
       for (let offset = 0; offset < CHANNEL_SIZE; offset++) {
@@ -1902,7 +2040,6 @@ I guess just let the error happen.*/
 
               const headerToChannelData = []
               if(channelData) {
-                // TODO: alter table to show fields as stored in radio.
                 // rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan
                 const tr = document.querySelector(`[data-location="${channelIndex}"]`);
                 const frequencyField = tr?.querySelector('[data-field="Frequency"]');
@@ -1950,7 +2087,7 @@ I guess just let the error happen.*/
                 visibleChannels();
               }
             }
-          } else if(addr <= ANI_START && ANI_START <= addr + CHUNK_SIZE) {
+          } else if(addr === ANI_START) {
             const aniCodeStart = 0x0CAA;
             const aniCodeEnd = aniCodeStart + 5;
             const aniCodeBytes = chunk.subarray(aniCodeStart - addr, aniCodeEnd - addr);
@@ -1961,6 +2098,8 @@ I guess just let the error happen.*/
             console.log('ANI chunk address:', addr.toString(16), aniCodeStart.toString(16), aniCode);
           } else if (addr === SETTINGS_START || addr === SETTINGS_START + CHUNK_SIZE) {
             gt5rDecodeSettings(chunk, addr);
+          } else if (addr === VFO_MEMORY_START) {
+            gt5rDecodeVfoTones(chunk);
           } else if (addr >= CHANNEL_MEMORY_NAMES_START) {
             for(let channelInChunk = 0; channelInChunk < CHUNK_SIZE/CHANNEL_SIZE/*4*/; channelInChunk++) {
               const channelSubarray = chunk.subarray(channelInChunk*CHANNEL_SIZE, channelInChunk*CHANNEL_SIZE + CHANNEL_SIZE);
@@ -1976,7 +2115,7 @@ I guess just let the error happen.*/
               visibleChannels();
             }
           }
-          // TODO: PTTID is 16bits at 0xb00 (0x0b08-0x8 the python code artificially puts the id at the beginning during gt5rIdent which we don't do here)
+          // TODO: PTTID is 16bits at 0xb00 (0x0b08-0x8)
           // TODO: poweron message is at 0x1810 (0x1818-0x8)
 
           if (onProgress) onProgress(addr + CHUNK_SIZE, CHANNEL_MEMORY_END);
@@ -2100,12 +2239,18 @@ I guess just let the error happen.*/
       const firstSetting = Math.max(0, settingsChunkStart - settingsStart);
       const lastSetting = Math.min(41, settingsChunkEnd - settingsStart);
       for (let index = firstSetting; index < lastSetting; index += 1) {
-        if ([10,11,12,13].includes(index)) continue; // {T/R}-{DCS/CTCSS}stored separatly
+        if (index === 1) continue; // tuning step stored vfo-a/vfo-b
+        if (index === 2) continue; // transmit power stored vfo-a/vfo-b
+        if (index === 5) continue; // wideband stored vfo-a/vfo-b
+        if ([10,11,12,13].includes(index)) continue; // {T/R}-{DCS/CTCSS}stored vfo-a/vfo-b
+
         if (index === 15) continue; // ani is stored separately
-        if (index === 17) continue; // PTTID a/b is stored separately
+        if (index === 17) continue; // PTTID stored vfo-a/vfo-b
         if (index === 20) continue; // PTT-LT stored separately
-        if (index === 26) continue; // OFFSET stored separately
-        if (index === 27 || index === 28) continue; // only works on device
+        if (index === 25) continue; // SFT-D stored vfo-a/vfo-b
+        if (index === 26) continue; // OFFSET stored vfo-a/vfo-b
+        if (index === 27 || index === 28) continue; // stored wmchannel?
+        if (index === 33) continue; // band stored vfo-a/vfo-b
         if (index === 40) continue; // rogerrx is not used on GT-5R, and field 40 only works on device
         const name = `settings-${index}`;
         let value = chunk[settingsStart + index - baseAddress];
@@ -2169,6 +2314,75 @@ I guess just let the error happen.*/
       status.textContent = chunkEnd >= settingsEnd
         ? 'Settings loaded from the GT-5R.'
         : 'Reading settings from the GT-5R...';
+    }
+
+    /**
+     * Decode the VFO tones from the GT-5R radio data.
+     * Address 0x0f00
+     * @param {Uint8Array} chunk - The raw data chunk from the radio.
+     */
+    function gt5rDecodeVfoTones(chunk) {
+      // example VFO tones data from the GT-5R radio
+      /*Read 64 bytes[
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0x04, 0x05, 0x02, 0x00, 0x05, 0x06, 0x02, 0x05,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd2, 0x00,
+      0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0x70, 0x3a,
+      
+      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0x04, 0x03, 0x07, 0x08, 0x08, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x9e, 0x02,
+      0xed, 0x09, 0x01, 0x00, 0x0a, 0x00, 0x50, 0xba
+      ] at 2026-10-10T16:26:19.993Z*/
+      ["a", "b"].forEach(vfo => {
+        let index = 8 + (vfo==="b" ? 32 : 0); ///8 bytes of nothing
+        const frequency = chunk.slice(index, index + 8).join("");
+        setControlValue(`vfo-${vfo}-frequency`, frequency);
+        index += 8;
+
+        const offset = chunk.slice(index, index + 6);
+        const offsetDigits = Array.from(offset);
+        const offsetValue = offsetDigits.reduce((total, digit) => total * 10 + digit, 0);
+        const offsetMHz = offsetDigits.every(digit => digit <= 9)
+          ? (offsetValue / 1000).toFixed(6)
+          : offsetDigits.join("");
+        setControlValue(`vfo-${vfo}-offset`, offsetMHz);
+        index += 6;
+
+        const rxTone = chunk[index] | (chunk[index + 1] << 8);
+        setControlValue(`vfo-${vfo}-rxtone`, rxTone === 0xffff ? 0 : rxTone);
+        index += 2;
+
+        const txTone = chunk[index] | (chunk[index + 1] << 8);
+        setControlValue(`vfo-${vfo}-txtone`, txTone === 0xffff ? 0 : txTone);
+        index += 2;
+
+        const band = (chunk[index] & 0b00000001);
+        setControlValue(`vfo-${vfo}-band`, band);
+        index +=1+1;
+
+        // u8 unused2:2,
+        const sftd = (chunk[index] & 0b00110000) >> 4;
+        setControlValue(`vfo-${vfo}-sftd`, sftd);
+        const scode = chunk[index] & 0b00001111;
+        setControlValue(`vfo-${vfo}-scode`, scode);
+        index +=1+1;
+        
+        // u8 unknown4;
+        // u8 unused3:1,
+        const step = (chunk[index] & 0b01110000) >> 4; // should be 7 (50 kHz)
+        setControlValue(`vfo-${vfo}-step`, step);
+        //const unused4 = (chunk[activeVfoStart + 8+6+3] & 0b11110000) >> 4;
+        index +=1;
+
+        const txpower = (chunk[index] & 0b10000000) >> 7;
+        setControlValue(`vfo-${vfo}-txpower`, txpower);
+        const widenarr = (chunk[index] & 0b01000000) >> 6;
+        setControlValue(`vfo-${vfo}-widenarr`, widenarr);
+        const txpower3 = chunk[index] & 0b00000011;
+
+        console.log(chunk, `frequency: ${frequency}, offset: ${offset.join("")}, rxTone: ${rxTone}, txTone: ${txTone}, band: ${band}, sftd: ${sftd}, scode: ${scode}, step: ${step}, txpower: ${txpower}, widenarr: ${widenarr}, txpower3: ${txpower3}`);
+      });
     }
 
     /**
