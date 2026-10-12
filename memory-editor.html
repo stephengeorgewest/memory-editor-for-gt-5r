@@ -48,16 +48,18 @@
     const CHANNEL_MEMORY_NAME_SIZE = 0x10;
     const CHANNEL_MEMORY_NAME_REAL_SIZE = 0x07;
     const CHANNEL_MEMORY_NAMES_START = 0x1000;
-    const CHANNEL_MEMORY_END = 0x1800;
-    const POWERON_MESSAGE_START = 0x1810; // containes sixpoweron_msg 2x7char and poweron_msg 2x7char (32 bytes?)
-    const FIRMWARE_MSG_START = 0x1830; // firmware message start
+    const CHANNEL_MEMORY_NAMES_END = 0x1800;
+    const GT5R_POWERON_MESSAGE_START = 0x1ec0; // containes 16 nothings, sixpoweron_msg 2x7char, and poweron_msg 2x7char (32 bytes?), and 8 firmwar message bytes
+    //const POWERON_MESSAGE_START = 0x1810;
+    //const FIRMWARE_MSG_START = 0x1830; // firmware message start
     const SQELCH_NEW_START = 0x18A0; // squelch new message start
     const SQELCH_OLD_START = 0x18E0; // squelch old message start
     const SQELCH_OLD_END = 0x18FF; // squelch old message end
     const LIMITS_NEW_START = 0x1900; // limits new message start
     const LIMITS_OLD_START = 0x1910; // limits new message end
     const OTHER_MEMORY_START = 0x1E80;
-    const OTHER_MEMORY_END = 0x1FC0;
+    const LIMITS_START = 0x1FC0;
+    const MAX_MEMORY_ADDRESS = 0x2000;
     // the rest of the settings start at 0x0E20 (0x0E28-0x8)
     // poweron message is at 0x1810 (0x1818-0x8)
     /**
@@ -1518,6 +1520,55 @@ let visible = 0;
               </td>
               <td>Sets the current keypad-lock state. Hold the # key on the radio to lock or unlock the keyboard.</td>
             </tr>
+            <tr class="disabled">
+              <td>--</td>
+              <td>Power On Message ???</td>
+              <td>
+                <input type="text" name="settings-poweron-message-a" value="" readonly/>
+                <input type="text" name="settings-poweron-message-b" value="" readonly/>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>--</td>
+              <td>Power On Message</td>
+              <td>
+                <input type="text" name="settings-poweron-message-c" value="" />
+                <input type="text" name="settings-poweron-message-d" value="" />
+              </td>
+              <td>ÿ is 255, and is not displayed. TODO: Allowed Characters.
+              </td>
+            </tr>
+            <tr class="disabled">
+              <td></td>
+              <td>Firmware Message</td>
+              <td>
+                <input type="text" name="settings-firmware-message" value="" readonly />
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>--</td>
+              <td>VHF Limit</td>
+              <td>
+                <table>
+                  <tr><th>TX Enabled</th><th>Lower</th><th>Upper</th></tr>
+                  <tr><td><input type="checkbox" name="settings-VHF-Limit-Enabled" value="1" /></td><td><input type="text" name="settings-VHF-Limit-Lower" value="" /></td><td><input type="text" name="settings-VHF-Limit-Upper" value="" /></td></tr>
+                </table>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>--</td>
+              <td>UHF Limit</td>
+              <td>
+                <table>
+                  <tr><th>TX Enabled</th><th>Lower</th><th>Upper</th></tr>
+                  <tr><td><input type="checkbox" name="settings-UHF-Limit-Enabled" value="1" /></td><td><input type="text" name="settings-UHF-Limit-Lower" value="" /></td><td><input type="text" name="settings-UHF-Limit-Upper" value="" /></td></tr>
+                </table>
+              </td>
+              <td></td>
+            </tr>
           </tbody>
         </table>
         </form>
@@ -1996,7 +2047,7 @@ I guess just let the error happen.*/
      * Represents the memory of the device.
      * Each index corresponds to a memory address, and the value is the 64-byte data chunk read from that address.
      */
-    const deviceMemory = new Array(CHANNEL_MEMORY_END/CHUNK_SIZE);
+    const deviceMemory = new Array(MAX_MEMORY_ADDRESS/CHUNK_SIZE);
 
     /**
      * Draws the current state of the device memory onto the canvas.
@@ -2006,7 +2057,7 @@ I guess just let the error happen.*/
       const context = canvas.getContext('2d');
       if (!context) return;
 
-      canvas.width = Math.ceil(CHANNEL_MEMORY_END / CHANNEL_SIZE);
+      canvas.width = Math.ceil(MAX_MEMORY_ADDRESS / CHANNEL_SIZE);
       canvas.height = CHANNEL_SIZE + 2;
 
       for (let i = 0; i < deviceMemory.length; i++) {
@@ -2030,7 +2081,7 @@ I guess just let the error happen.*/
 
       // draw channel memory names indicator
       const channelMemoryNameImageStart = CHANNEL_MEMORY_NAMES_START / CHANNEL_SIZE;
-      const channelMemoryNameImageWidth = (CHANNEL_MEMORY_NAMES_START - CHANNEL_MEMORY_END) / CHANNEL_SIZE;
+      const channelMemoryNameImageWidth = (CHANNEL_MEMORY_NAMES_START - CHANNEL_MEMORY_NAMES_END) / CHANNEL_SIZE;
       const channelMemoryNameImageData = context.getImageData(
         channelMemoryNameImageStart, canvas.height - 1,
         channelMemoryNameImageWidth, 1
@@ -2083,7 +2134,7 @@ I guess just let the error happen.*/
         const context = canvas.getContext('2d');
         
         const chunks = [];
-        for (let chunkIndex = CHANNEL_MEMORY_START; chunkIndex < CHANNEL_MEMORY_END/CHUNK_SIZE; chunkIndex++) {
+        for (let chunkIndex = CHANNEL_MEMORY_START; chunkIndex < MAX_MEMORY_ADDRESS/CHUNK_SIZE; chunkIndex++) {
           const addr = CHANNEL_MEMORY_START + chunkIndex * CHUNK_SIZE;
           const chunk = await gt5rReadBlock(byteReader, addr, addr === 0);
           chunks.push(chunk);
@@ -2160,20 +2211,21 @@ I guess just let the error happen.*/
               .join('');
             setControlValue('settings-15', aniCode);
             //console.log('ANI chunk address:', addr.toString(16), aniCodeStart.toString(16), aniCode);
-          } else if (addr === SETTINGS_START || addr === SETTINGS_START + CHUNK_SIZE) {
-            gt5rDecodeSettings(chunk, addr);
-          } else if (WM_CHANNEL_START <= addr && addr <= (WM_CHANNEL_START + CHUNK_SIZE)) {
-            //console.log('WM chunk address:', addr.toString(16));
-            //console.log(chunk);
-            // Always 127?
-            const dataStartIndex = addr - WM_CHANNEL_START;
+          } else if (addr === SETTINGS_START) {
+            gt5rDecodeSettings(chunk);
+          } else if (addr === (SETTINGS_START + CHUNK_SIZE)/*0x0E40*/) {
+            // console.log('WM chunk address:', addr.toString(16));
+            gt5rDecodeSettings2(chunk);
+            // console.log(chunk);
+            // never in memory dump? they are retained across reboots.
+           /* const dataStartIndex = WM_CHANNEL_START - addr;
             const mrChannelData_A = chunk[dataStartIndex + 0] & 0b01111111;
             const mrChannelData_B = chunk[dataStartIndex + 1] & 0b01111111;
             setControlValue('mem-ch-a', mrChannelData_A);
-            setControlValue('mem-ch-b', mrChannelData_B);
+            setControlValue('mem-ch-b', mrChannelData_B);*/
           } else if (addr === VFO_MEMORY_START) {
             gt5rDecodeVfoTones(chunk);
-          } else if (addr >= CHANNEL_MEMORY_NAMES_START) {
+          } else if (CHANNEL_MEMORY_NAMES_START <= addr && addr < CHANNEL_MEMORY_NAMES_END) {
             for(let channelInChunk = 0; channelInChunk < CHUNK_SIZE/CHANNEL_SIZE/*4*/; channelInChunk++) {
               const channelSubarray = chunk.subarray(channelInChunk*CHANNEL_SIZE, channelInChunk*CHANNEL_SIZE + CHANNEL_SIZE);
 
@@ -2187,11 +2239,45 @@ I guess just let the error happen.*/
             
               visibleChannels();
             }
-          }
-          // TODO: PTTID is 16bits at 0xb00 (0x0b08-0x8)
-          // TODO: poweron message is at 0x1810 (0x1818-0x8)
+          } else if (addr === GT5R_POWERON_MESSAGE_START) {
+            const messagea = String.fromCharCode(...chunk.slice(16, 16 + 7));
+            const messageb = String.fromCharCode(...chunk.slice(16 + 8, 16+8+7));
+            const poweron_msg_a = String.fromCharCode(...chunk.slice(16 + 16, 16+16+ 7));
+            const poweron_msg_b = String.fromCharCode(...chunk.slice(16 + 24, 16+24+7));
+            const firmware_message = String.fromCharCode(...chunk.slice(16 + 32, 16 + 32 + 8));
 
-          if (onProgress) onProgress(addr + CHUNK_SIZE, CHANNEL_MEMORY_END);
+            setControlValue('settings-poweron-message-a', messagea);
+            setControlValue('settings-poweron-message-b', messageb);
+            setControlValue('settings-poweron-message-c', poweron_msg_a);
+            setControlValue('settings-poweron-message-d', poweron_msg_b);
+            setControlValue('settings-firmware-message', firmware_message);
+          } else if (addr === LIMITS_START){
+            const vhfLimitEnabled = (chunk[0] & 0b00000001) !== 0;
+            const vhfLimitLower = parseInt(
+              chunk[1].toString(16).padStart(2, '0') + chunk[2].toString(16).padStart(2, '0')
+            );
+            const vhfLimitUpper = parseInt(
+              chunk[3].toString(16).padStart(2, '0') + chunk[4].toString(16).padStart(2, '0')
+            );
+
+            setControlValue('settings-VHF-Limit-Enabled', vhfLimitEnabled ? 1 : 0);
+            setControlValue('settings-VHF-Limit-Lower', vhfLimitLower);
+            setControlValue('settings-VHF-Limit-Upper', vhfLimitUpper);
+
+            const uhfLimitEnabled = (chunk[5] & 0b00000001) !== 0;
+            const uhfLimitLower = parseInt(
+              chunk[6].toString(16).padStart(2, '0') + chunk[7].toString(16).padStart(2, '0')
+            );
+            const uhfLimitUpper = parseInt(
+              chunk[8].toString(16).padStart(2, '0') + chunk[9].toString(16).padStart(2, '0')
+            );
+
+            setControlValue('settings-UHF-Limit-Enabled', uhfLimitEnabled ? 1 : 0);
+            setControlValue('settings-UHF-Limit-Lower', uhfLimitLower);
+            setControlValue('settings-UHF-Limit-Upper', uhfLimitUpper);
+          }
+
+          if (onProgress) onProgress(addr + CHUNK_SIZE, MAX_MEMORY_ADDRESS);
         }
         
         // create a single array of the length of the chunks combined
@@ -2295,23 +2381,13 @@ I guess just let the error happen.*/
     /**
      * Decode the settings from a GT-5R radio data chunk.
      * @param {Uint8Array} chunk - The raw data chunk from the radio.
-     * @param {number} baseAddress - The base address of the chunk.
      * @returns {void}
      */
-    function gt5rDecodeSettings(chunk, baseAddress) {
+    function gt5rDecodeSettings(chunk) {
       //the settings(excluding some separately stored fields) start at 0x0E20 (0x0E28-0x8) spans a 64-byte boundary and should be read in two chunks since it is less than 64 bytes
-      const settingsStart = 0x0e20;
-      const settingsEnd = settingsStart + 46;
-      const chunkEnd = baseAddress + chunk.length;
-      const settingsChunkStart = Math.max(settingsStart, baseAddress);
-      const settingsChunkEnd = Math.min(settingsEnd, chunkEnd);
-      const hasSettings = settingsChunkStart < settingsChunkEnd;
-      
-      if (!hasSettings) return;
+      const settingsStart = 0x020;
 
-      const firstSetting = Math.max(0, settingsChunkStart - settingsStart);
-      const lastSetting = Math.min(41, settingsChunkEnd - settingsStart);
-      for (let index = firstSetting; index < lastSetting; index += 1) {
+      for (let index = 0; index < 32; index += 1) {
         if (index === 1) continue; // tuning step stored vfo-a/vfo-b
         if (index === 2) continue; // transmit power stored vfo-a/vfo-b
         if (index === 5) continue; // wideband stored vfo-a/vfo-b
@@ -2323,30 +2399,41 @@ I guess just let the error happen.*/
         if (index === 25) continue; // SFT-D stored vfo-a/vfo-b
         if (index === 26) continue; // OFFSET stored vfo-a/vfo-b
         if (index === 27 || index === 28) continue; // stored wmchannel?
-        if (index === 33) continue; // band stored vfo-a/vfo-b
-        if (index === 40) continue; // rogerrx is not used on GT-5R, and field 40 only works on device
         const name = `settings-${index}`;
-        let value = chunk[settingsStart + index - baseAddress];
+        let value = chunk[index+settingsStart];
         if (index === 10 || index === 12) value = value === 0 ? 0 : String(value).padStart(3, '0');
         if (index === 11 || index === 13) value = value === 0 ? 0 : String(value).padStart(2, '0');
         if (index === 18) value &= 0x03;
         if (index === 25) value &= 0x03;
-        if (index === 32 && value > 2) value = 1;
+
         setControlValue(name, value);
-        //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting ${name} = ${value}`);
+      }
+    }
+    
+    function gt5rDecodeSettings2(chunk) {
+      // console.log(`Decoding settings2 chunk: ${chunk}`);
+      const offset = 0x20; // split across32bytes
+      for (let index = offset; index < 41; index += 1) {
+        if (index === 33) continue; // band stored vfo-a/vfo-b
+        if (index === 40) continue; // rogerrx is not used on GT-5R, and field 40 only works on device
+        let value = chunk[index - offset];
+        if (index === 32 && value > 2) value = 1;
+        const name = `settings-${index}`;
+        setControlValue(name, value);
+        // console.log(`Setting ${name} = ${value}`);
       }
 
       // TODO: handle indices 40+ since they are some of them have values?
       // and not in a numbered menu item.
       // looks like 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x08, 0x00 
-      let value40 = chunk[settingsStart + 40 - baseAddress];
+      let value40 = chunk[40 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-40 = ${value40} rogerRX`);
       // ALways 1?
       
-      let value41 = chunk[settingsStart + 41 - baseAddress];
+      let value41 = chunk[41 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-41 = ${value41} tdrch`);
       
-      let value42 = chunk[settingsStart + 42 - baseAddress];
+      let value42 = chunk[42 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-42 = ${value42} packed`);
       const displayab = (value42 & 0b10000000) >> 7;
       const someFlag  = (value42 & 0b01100000) >> 5;
@@ -2364,38 +2451,35 @@ I guess just let the error happen.*/
       //console.log(`displayab: ${displayab}, someFlag: ${someFlag}, fmradio: ${fmradio}, alarm: ${alarm}, reset: ${reset}, menu: ${menu}`);
 
       
-      let value43 = chunk[settingsStart + 43 - baseAddress];
+      let value43 = chunk[43 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-43 = ${value43} packed2`);
       const unknown43 = (value43 & 0b11111100) >> 2; // placeholder for unknown bits in value43
       const singleptt = (value43 & 0b00000010) >> 1;
       const vfomrlock = (value43 & 0b00000001); // VFO MR lock
       //console.log(`unknown43: ${unknown43}, singleptt: ${singleptt}, vfomrlock: ${vfomrlock}`);
       
-      let value44 = chunk[settingsStart + 44 - baseAddress];
+      let value44 = chunk[44 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-44 = ${value44} workmode`);
       setControlValue('settings-44-workmode', (value44 & 0b00000001));
       
-      let value45 = chunk[settingsStart + 45 - baseAddress]; // keylock
+      let value45 = chunk[45 - offset]; // keylock
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-45 = ${value45} keylock`);
       setControlValue('settings-45-keylock', (value45 & 0b00000001));
       
       // Byte after settings end
-      let value46 = chunk[settingsStart + 46 - baseAddress];
+      let value46 = chunk[46 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-46 = ${value46} post-settings`);
       const postSettingsFlag = (value46 & 0b10000000) >> 7; // placeholder for post-settings flag in value46
       const remaining      = value46 & 0b01111111; // placeholder for another flag in value46
       //console.log(`postSettingsFlag: ${postSettingsFlag}, remaining: ${remaining}`);
 
-      let value47 = chunk[settingsStart + 47 - baseAddress];
+      let value47 = chunk[47 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-47 = ${value47} post settings 2`);
       
-      let value48 = chunk[settingsStart + 48 - baseAddress];
+      let value48 = chunk[48 - offset];
       //console.log(`BaseAddress: ${baseAddress.toString(16)}: Setting settings-48 = ${value48} should be 0xFF`);
 
       const status = document.querySelector('#radio-settings-status');
-      status.textContent = chunkEnd >= settingsEnd
-        ? 'Settings loaded from the GT-5R.'
-        : 'Reading settings from the GT-5R...';
     }
 
     /**
