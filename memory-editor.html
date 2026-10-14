@@ -50,14 +50,9 @@
     const CHANNEL_MEMORY_NAMES_START = 0x1000;
     const CHANNEL_MEMORY_NAMES_END = 0x1800;
     const GT5R_POWERON_MESSAGE_START = 0x1ec0; // containes 16 nothings, sixpoweron_msg 2x7char, and poweron_msg 2x7char (32 bytes?), and 8 firmwar message bytes
-    //const POWERON_MESSAGE_START = 0x1810;
-    //const FIRMWARE_MSG_START = 0x1830; // firmware message start
-    const SQELCH_NEW_START = 0x18A0; // squelch new message start
-    const SQELCH_OLD_START = 0x18E0; // squelch old message start
-    const SQELCH_OLD_END = 0x18FF; // squelch old message end
-    const LIMITS_NEW_START = 0x1900; // limits new message start
-    const LIMITS_OLD_START = 0x1910; // limits new message end
-    const OTHER_MEMORY_START = 0x1E80;
+
+    const SQUELCH_VHF_START = 0x1F40;
+    const SQUELCH_UHF_START = 0x1F80;
     const LIMITS_START = 0x1FC0;
     const MAX_MEMORY_ADDRESS = 0x2000;
     // the rest of the settings start at 0x0E20 (0x0E28-0x8)
@@ -1586,11 +1581,12 @@ let visible = 0;
               </td>
               <td></td>
             </tr>
+            <tr><th colspan="4">DTMF Settings</th></tr>
             <script>
               Array(15).fill().forEach((_, i) => {
                 document.write(`
                   <tr id="settings-pttid-${i+1}">
-                    <td>--</td>
+                    <th>${i+1}</th>
                     <td>PTTID ${i + 1}</td>
                     <td>
                       <input type="text" name="settings-pttid-${i+1}" value="" />
@@ -1638,6 +1634,22 @@ let visible = 0;
               </td>
               <td></td>
             </tr>
+            
+            <script>
+              ["VHF","UHF"].forEach(band => {
+                document.write("<tr><th colspan='4'>" + band + " Squelch</th></tr>")
+                Array(10).fill(0).forEach((_, index) => {
+                  document.write(`
+                  <tr id="settings-${band.toLowerCase()}-squelch-${index}">
+                    <td class="channel">${index}</td>
+                    <td class="squelch">${band} Squelch ${index}</td>
+                    <td><input type="text" name="settings-${band.toLowerCase()}-squelch-${index}" /></td>
+                    <td>0-123</td>
+                  </tr>
+                  `);
+                });
+              });
+            </script>
           </tbody>
         </table>
         </form>
@@ -2352,6 +2364,38 @@ I guess just let the error happen.*/
             setControlValue('settings-poweron-message-c', poweron_msg_a);
             setControlValue('settings-poweron-message-d', poweron_msg_b);
             setControlValue('settings-firmware-message', firmware_message);
+          } else if (addr === SQUELCH_VHF_START) {
+            /*Read 4 bytes[0x58, 0x1f, 0x40, 0x40] at 2026-10-14T03:31:55.428Z
+            Read 64 bytes[
+            0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4,
+            0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0x96,
+            0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xb4,
+            0xb4, 0xb4, 0xb4, 0xb4, 0xb4, 0xff, 0xff, 0xff,
+            0x00, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a,
+            0x7b, 0x7c, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f,
+            0x03, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09,
+            0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x19, 0x19
+            ] at 2026-10-14T03:31:55.468Z*/
+            // TODO: look at bytes at beginning/end?
+            for(let i = 0; i < 10; i++) {
+              setControlValue(`settings-vhf-squelch-${i}`, chunk[i+32]);
+            }
+          } else if (addr === SQUELCH_UHF_START) {
+            /*Read 4 bytes[0x58, 0x1f, 0x80, 0x40] at 2026-10-14T03:31:55.510Z
+            Read 64 bytes[
+            0x00, 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63,
+            0x64, 0x65, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f,
+            0x03, 0x03, 0x06, 0x07, 0x08, 0x0a, 0x0a, 0x0a,
+            0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a,
+            0x1f, 0x46, 0x32, 0x38, 0x6c, 0x6c, 0x00, 0x00,
+            0xff, 0x09, 0x72, 0x74, 0x75, 0x82, 0x91, 0x9b,
+            0x04, 0x04, 0x04, 0x03, 0x03, 0x03, 0x03, 0x03,
+            0x03, 0x03, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00
+            ] at 2026-10-14T03:31:55.550Z*/
+            for(let i = 0; i < 10; i++) {
+              setControlValue(`settings-uhf-squelch-${i}`, chunk[i]);
+            }
+            //TODO: data after first 10 bytes?
           } else if (addr === LIMITS_START) {
             const vhfLimitEnabled = (chunk[0] & 0b00000001) !== 0;
             const vhfLimitLower = parseInt(
