@@ -39,7 +39,7 @@
      // the python code artificially puts the id at the beginning during gt5rIdent which we don't do here
     const CHANNEL_MEMORY_START = 0x0000;
     const CHANNEL_MEMORY_DATA_END = 0x0800; //only 128 channels
-    const PTTID_START = 0x0b00;// PTTID is 16bits at 0xb00 (0x0b08-0x8), repeated 15 times up to half of 0x0BC0
+    const PTTID_START = 0x0B00;// PTTID is 16bits at 0xb00 (0x0b08-0x8), repeated 15 times up to half of 0x0BC0
     const ANI_START = 0x0C80;// ani is 5 bytes? at 0x0cb2 within this struct(0x0C88-0x8), currently set to "80808" on the device
     const SETTINGS_START = 0x0E00; /// start of the settings memory block settings are split between 2 chunks
     const WM_CHANNEL_START = 0x0E76; // Workmode channel start
@@ -530,6 +530,10 @@
       margin-top: 0.2rem;
       vertical-align: top;
     }
+    label:has(input[type=radio]){
+        margin-left: 1.5rem;
+        text-indent: -1.5rem;
+    }
 
     td > p {
       text-indent: -1rem;
@@ -723,6 +727,15 @@
   <option value="5">5: 20.0 kHz</option>
   <option value="6">6: 25.0 kHz</option>
   <option value="7">7: 50.0 kHz</option>
+</datalist>
+
+<datalist id="DTMF-Speed-datalist">
+  <script>
+    Array(196).fill(0).forEach((_, index) => {
+      const speed = 50 + index * 10;
+      document.write(`<option value="${index}" label="${speed} ms [${index}]">${speed} ms [${index}]</option>`);
+    });
+  </script>
 </datalist>
 
 <body>
@@ -1115,19 +1128,21 @@ let visible = 0;
               <td>15</td>
               <td>ANI-ID - Automatic Number ID</td>
               <td><input id="settings-15" name="settings-15" type="text" inputmode="numeric" value="" aria-label="ANI code programmed by computer software"></td>
-              <td><del>Displays</del> the ANI code which has been set by computer software. <del>This menu cannot be used to change it</del>. The ANI-ID is sent when the alarm is activated and <a href="#setting-32">menu 32</a>=CODE.</td>
+              <td><del>Displays</del> the ANI code which has been set by computer software. <del>This menu cannot be used to change it</del>. The ANI-ID is sent when the alarm is activated and <a href="#settings-32">menu 32</a>=CODE.</td>
             </tr>
             <tr id="settings-16">
               <td>16</td>
               <td>DTMFST - DTMF Side Tone of Transmit Code</td>
               <td><label id="settings-16">
                 <input name="settings-16" type="radio" value="0">OFF [0]: no DTMF Side Tones are heard.</input></label>
-                <label><input name="settings-16" type="radio" value="1">ANI-ST [1?]: manual does not indicate this setting, but it is exists on the handset between DT-ST and DT+ANI.</input></label>
-                <label><input name="settings-16" type="radio" value="2">DT-ST [2]:  Side Tones are heard only from automatically keyed DTMF tones</input></label>
+                <label><input name="settings-16" type="radio" value="1">DT-ST [1]:  Side Tones are heard only from automatically keyed DTMF tones</input></label>
+                <label><input name="settings-16" type="radio" value="2">ANI-ST [2]:  Sounds automatic ANI/PTT-ID tones(Manual does not indicate this setting, but it is exists on the handset between DT-ST and DT+ANI).</input></label>
                 <label><input name="settings-16" type="radio" value="3">DT+ANI [3]: All DTMF Side Tones are heard</input></label>
               </td>
               <td>
                 <p>Determines when DTMF Side Tones can be heard from the transceiver speaker.</p>
+                <p><a href="#settings-dtmf-on">DTMF On Setting</a></p>
+                <p><a href="#settings-dtmf-off">DTMF Off Setting</a></p>
               </td>
             </tr>
             <tr id="settings-17">
@@ -1181,7 +1196,7 @@ let visible = 0;
                 </table>
               </td>
               <td>
-                Selects one of 15 DTMF codes. The DTMF codes are programmed with computer software and are up to 5 characters/digits each.
+                <p>Selects one of 15 DTMF codes. The DTMF codes are <a href="#settings-pttid-1">programmed with computer</a> software and are up to 5 characters/digits each.</p>
               </td>
             </tr>
             <tr id="settings-18">
@@ -1206,10 +1221,12 @@ let visible = 0;
               <td>PTT-ID - When to Send PTT-ID</td>
               <td><label><input type="radio" name="settings-19" value="0">OFF [0]: No ID is sent</label>
                 <label><input type="radio" name="settings-19" value="1">BOT [1]: The selected S-CODE is sent at the beginning</label>
-                <label><input type="radio" name="settings-19" value="2">EOT [2]: The selected S-CODE is sent at the beginning and ending</label>
+                <label><input type="radio" name="settings-19" value="2">EOT [2]: The selected S-CODE is sent at the <del>beginning and </del>ending</label>
+                <label><input type="radio" name="settings-19" value="3">Both [3]: The selected S-CODE is sent at the beginning and ending</label>
               </td>
               <td>
                 <p>Selects whether the selected S-CODE is sent at the beginning or ending of a transmission.</p>
+                <p>Note: effects vfo only, not memory channels. Applies to both A and B VFOs.</p>
               </td>
             </tr>
             <tr id="settings-20">
@@ -1362,7 +1379,7 @@ let visible = 0;
               <td>
                 <p>SITE: Sounds alarm through your radio speaker only</p>
                 <p>TONE: Transmits a cycling tone over-the-air</p>
-                <p>CODE: Transmits '119' (911 in reverse?) followed by the ANI code programmed by the computer software over-the-air.</p>
+                <p>CODE: Transmits <a href="#settings-alarm-code">'119' (911 in reverse?)</a>  followed by the <a href="#settings-15">ANI code programmed by the computer software</a> over-the-air.</p>
               </td>
             </tr>
             <tr id="settings-33">
@@ -1566,6 +1583,58 @@ let visible = 0;
                   <tr><th>TX Enabled</th><th>Lower</th><th>Upper</th></tr>
                   <tr><td><input type="checkbox" name="settings-UHF-Limit-Enabled" value="1" /></td><td><input type="text" name="settings-UHF-Limit-Lower" value="" /></td><td><input type="text" name="settings-UHF-Limit-Upper" value="" /></td></tr>
                 </table>
+              </td>
+              <td></td>
+            </tr>
+            <script>
+              Array(15).fill().forEach((_, i) => {
+                document.write(`
+                  <tr id="settings-pttid-${i+1}">
+                    <td>--</td>
+                    <td>PTTID ${i + 1}</td>
+                    <td>
+                      <input type="text" name="settings-pttid-${i+1}" value="" />
+                    </td>
+                    <td>${ (i === 0) ? '<a href="#settings-17">Used in setting #17 S-CODE - Signal Code</a>' : ""}</td>
+                  </tr>
+                `);
+              });
+            </script>
+            <tr id="settings-alarm-code">
+              <td>--</td>
+              <td>Alarm Code</td>
+              <td>
+                <input type="text" name="settings-alarm-code" value="" />
+              </td>
+              <td></td>
+            </tr>
+            <tr id="settings-ani-id">
+              <td>--</td>
+              <td>ANI-ID - When to Send ANI-ID</td>
+              <td><label><input type="radio" name="settings-ani-id" value="0">OFF [0]: No ID is sent</label>
+                <label><input type="radio" name="settings-ani-id" value="1">BOT [1]: The ANI-ID is sent at the beginning</label>
+                <label><input type="radio" name="settings-ani-id" value="2">EOT [2]: The ANI-ID is sent at the ending</label>
+                <label><input type="radio" name="settings-ani-id" value="3">Both [3]: The ANI-ID is sent at the beginning and ending</label>
+              </td>
+              <td>
+                <p>Selects whether the selected ANI-ID is sent at the beginning or ending of a transmission.</p>
+              </td>
+            </tr>
+            <tr id="settings-dtmf-on">
+              <td>--</td>
+              <td>DTMF On</td>
+              <td>
+                <input type="number" list="DTMF-Speed-datalist" name="settings-dtmf-on" value="" />
+              </td>
+              <td><p>
+                50-2000ms
+              </p><a href="#settings-16">Used in setting #16 DTMFST</a></td>
+            </tr>
+            <tr id="settings-dtmf-off">
+              <td>--</td>
+              <td>DTMF Off</td>
+              <td>
+                <input type="number" min="0" max="19" step="1" list="DTMF-Speed-datalist" name="settings-dtmf-off" value="" />
               </td>
               <td></td>
             </tr>
@@ -2141,7 +2210,7 @@ I guess just let the error happen.*/
           deviceMemory[chunkIndex] = chunk;
           drawChunk(context, chunk, addr);
 
-          if(addr < CHANNEL_MEMORY_DATA_END){
+          if(addr < CHANNEL_MEMORY_DATA_END) {
             for(let channelInChunk = 0; channelInChunk < CHUNK_SIZE/CHANNEL_SIZE/*4*/; channelInChunk++) {
               const channelSubarray = chunk.subarray(channelInChunk*CHANNEL_SIZE, channelInChunk*CHANNEL_SIZE + CHANNEL_SIZE);
 
@@ -2198,11 +2267,28 @@ I guess just let the error happen.*/
                 visibleChannels();
               }
             }
-          } else if (PTTID_START <= addr && addr < PTTID_START + CHUNK_SIZE) {
-            console.log('PTTID chunk address:', addr.toString(16));
-            console.log(chunk);
-            // TODO
+          } else if (PTTID_START <= addr && addr < PTTID_START + CHUNK_SIZE*4) {
+            //console.log('PTTID chunk address:', addr.toString(16));
+            //console.log(chunk);
+            let chunkIndex = (addr - PTTID_START)/CHUNK_SIZE; // spans multiple chunks
+
+            // 4 per chunk
+            for(let i = 0; i < 4; i++) {
+              const pttidIndexInChunk = i*CHUNK_SIZE/4;
+              const pttidSubarray = chunk.slice(pttidIndexInChunk, pttidIndexInChunk+5);
+              const settingName = "settings-pttid-" + (i+1 + chunkIndex*4);
+              const settingValue = pttidSubarray.join('');
+              //console.log(settingName, settingValue);
+              setControlValue(settingName, settingValue);
+            }
           } else if(addr === ANI_START) {
+            //console.log(chunk);
+            //TODO: ALARM CODES. Chirp only exposes the third value? 
+            for(let i=0; i < 3; i++) {
+              const code = chunk.slice(i*5, i*5+3).join("");
+              //console.log(code);
+              if(i===2) setControlValue('settings-alarm-code', code);
+            }
             const aniCodeStart = 0x0CAA;
             const aniCodeEnd = aniCodeStart + 5;
             const aniCodeBytes = chunk.subarray(aniCodeStart - addr, aniCodeEnd - addr);
@@ -2210,7 +2296,22 @@ I guess just let the error happen.*/
               .map((byte) => (byte === 0xff ? '' : String(byte)))
               .join('');
             setControlValue('settings-15', aniCode);
+
             //console.log('ANI chunk address:', addr.toString(16), aniCodeStart.toString(16), aniCode);
+            const aniid = chunk[aniCodeEnd - addr] & 0b00000011;
+            //console.log('ANI ID:', aniid, chunk[aniCodeEnd - addr]);
+            setControlValue('settings-ani-id', aniid);
+
+            //const DTMF_SIDETONES = chunk[DTMF_OFFSET - addr] & 0b00000011;
+            //setControlValue('settings-dtmf-sidetones', DTMF_SIDETONES);
+
+            const DTMF_OFFSET = 0x0CB1;
+            const dtmfOn = chunk[DTMF_OFFSET - addr +1];
+            setControlValue('settings-dtmf-on', dtmfOn);
+
+            const dtmfOff = chunk[DTMF_OFFSET - addr +2];
+            setControlValue('settings-dtmf-off', dtmfOff);
+
           } else if (addr === SETTINGS_START) {
             gt5rDecodeSettings(chunk);
           } else if (addr === (SETTINGS_START + CHUNK_SIZE)/*0x0E40*/) {
@@ -2251,7 +2352,7 @@ I guess just let the error happen.*/
             setControlValue('settings-poweron-message-c', poweron_msg_a);
             setControlValue('settings-poweron-message-d', poweron_msg_b);
             setControlValue('settings-firmware-message', firmware_message);
-          } else if (addr === LIMITS_START){
+          } else if (addr === LIMITS_START) {
             const vhfLimitEnabled = (chunk[0] & 0b00000001) !== 0;
             const vhfLimitLower = parseInt(
               chunk[1].toString(16).padStart(2, '0') + chunk[2].toString(16).padStart(2, '0')
@@ -2395,7 +2496,6 @@ I guess just let the error happen.*/
 
         if (index === 15) continue; // ani is stored separately
         if (index === 17) continue; // PTTID stored vfo-a/vfo-b
-        if (index === 20) continue; // PTT-LT stored separately
         if (index === 25) continue; // SFT-D stored vfo-a/vfo-b
         if (index === 26) continue; // OFFSET stored vfo-a/vfo-b
         if (index === 27 || index === 28) continue; // stored wmchannel?
