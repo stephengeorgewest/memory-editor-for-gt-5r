@@ -1647,7 +1647,7 @@ let visible = 0;
               </td>
               <td></td>
             </tr>
-            <tr><th colspan='4'>Service calibration threshold for ${band.toLowerCase()} squelch level ${index}. Change only when calibrating the receiver with appropriate test equipment.</th></tr>
+            <tr><th colspan='4'>Service calibration threshold for ${band} squelch level ${index}. Change only when calibrating the receiver with appropriate test equipment.</th></tr>
             <script>
               const factorySquelch = {VHF: [
                 0,116,117,118,119,120,121,122,123,124
@@ -1658,10 +1658,10 @@ let visible = 0;
                 document.write("<tr><th colspan='4'>" + band + " Squelch</th></tr>")
                 Array(10).fill(0).forEach((_, index) => {
                   document.write(`
-                  <tr id="settings-${band.toLowerCase()}-squelch-${index}">
+                  <tr id="settings-${band}-squelch-${index}">
                     <td class="channel">${index}</td>
                     <td class="squelch">${band} Squelch ${index}</td>
-                    <td><input type="number" min="0" max="123" name="settings-${band.toLowerCase()}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
+                    <td><input type="number" min="0" max="123" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
                     <td>Factory Default?: ${factorySquelch[band][index]}</td>
                   </tr>
                   `);
@@ -2364,7 +2364,7 @@ I guess just let the error happen.*/
             ] at 2026-10-14T03:31:55.468Z*/
             // TODO: look at bytes at beginning/end?
             for(let i = 0; i < 10; i++) {
-              setControlValue(`settings-vhf-squelch-${i}`, chunk[i+32]);
+              setControlValue(`settings-VHF-squelch-${i}`, chunk[i+32]);
             }
           } else if (addr === SQUELCH_UHF_START) {
             /*Read 4 bytes[0x58, 0x1f, 0x80, 0x40] at 2026-10-14T03:31:55.510Z
@@ -2379,7 +2379,7 @@ I guess just let the error happen.*/
             0x03, 0x03, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00
             ] at 2026-10-14T03:31:55.550Z*/
             for(let i = 0; i < 10; i++) {
-              setControlValue(`settings-uhf-squelch-${i}`, chunk[i]);
+              setControlValue(`settings-UHF-squelch-${i}`, chunk[i]);
             }
             //TODO: data after first 10 bytes?
           } else if (addr === LIMITS_START) {
