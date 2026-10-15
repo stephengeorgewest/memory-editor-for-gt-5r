@@ -496,6 +496,19 @@
       padding: .25rem .15rem;
       width: 100%;
     }
+    td:has(>.changed)::after, td:has(>.not-factory-default)::after {
+      position: absolute;
+    }
+    td:has(>.not-factory-default)::after {
+      content: "†";
+      color: var(--warning);
+    }
+    td:has(>.changed)::after {
+      content: "*";
+    }
+    td:has(>.changed.not-factory-default)::after {
+      content: "*†";
+    }
     th.name,td.name {
       width: 5rem;
       min-width: 5rem;
@@ -1600,7 +1613,7 @@ let visible = 0;
               <td>--</td>
               <td>Alarm Code</td>
               <td>
-                <input type="text" name="settings-alarm-code" value="" />
+                <input type="text" name="settings-alarm-code" value="" data-factory_default="119" />
               </td>
               <td></td>
             </tr>
@@ -1620,7 +1633,7 @@ let visible = 0;
               <td>--</td>
               <td>DTMF On</td>
               <td>
-                <input type="number" list="DTMF-Speed-datalist" name="settings-dtmf-on" value="" />
+                <input type="number" list="DTMF-Speed-datalist" name="settings-dtmf-on" value="" data-factory_default="3" />
               </td>
               <td><p>
                 50-2000ms
@@ -1630,12 +1643,17 @@ let visible = 0;
               <td>--</td>
               <td>DTMF Off</td>
               <td>
-                <input type="number" min="0" max="19" step="1" list="DTMF-Speed-datalist" name="settings-dtmf-off" value="" />
+                <input type="number" min="0" max="19" step="1" list="DTMF-Speed-datalist" name="settings-dtmf-off" value="" data-factory_default="3" />
               </td>
               <td></td>
             </tr>
             <tr><th colspan='4'>Service calibration threshold for ${band.toLowerCase()} squelch level ${index}. Change only when calibrating the receiver with appropriate test equipment.</th></tr>
             <script>
+              const factorySquelch = {VHF: [
+                0,116,117,118,119,120,121,122,123,124
+              ], UHF: [
+                0, 93, 94, 95, 96, 97, 98, 99,100,101
+              ]};
               ["VHF","UHF"].forEach(band => {
                 document.write("<tr><th colspan='4'>" + band + " Squelch</th></tr>")
                 Array(10).fill(0).forEach((_, index) => {
@@ -1643,8 +1661,8 @@ let visible = 0;
                   <tr id="settings-${band.toLowerCase()}-squelch-${index}">
                     <td class="channel">${index}</td>
                     <td class="squelch">${band} Squelch ${index}</td>
-                    <td><input type="number" min="0" max="123" name="settings-${band.toLowerCase()}-squelch-${index}" /></td>
-                    <td></td>
+                    <td><input type="number" min="0" max="123" name="settings-${band.toLowerCase()}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
+                    <td>Factory Default?: ${factorySquelch[band][index]}</td>
                   </tr>
                   `);
                 });
@@ -1801,6 +1819,13 @@ I guess just let the error happen.*/
       document.querySelector('#select-serial-log').addEventListener('change', (event) => {
         const index = Number(event.target.value);
         showSerialLog(index);
+      });
+
+      highlightFactoryDefaultVariations();
+      highlightChanges();
+      document.querySelector('#gt5rSettingsForm').addEventListener('input', () => {
+        highlightFactoryDefaultVariations();
+        highlightChanges();
       });
     }
     function showSerialLog(index) {
@@ -2385,6 +2410,8 @@ I guess just let the error happen.*/
 
           if (onProgress) onProgress(addr + CHUNK_SIZE, MAX_MEMORY_ADDRESS);
         }
+        highlightFactoryDefaultVariations();
+        highlightChanges();
         
         // create a single array of the length of the chunks combined
         const data = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
@@ -2478,12 +2505,35 @@ I guess just let the error happen.*/
 
     function setControlValue(name, value) {
       const form = document.querySelector('#gt5rSettingsForm');
-      form.querySelectorAll(`[name="${name}"], #${name}`).forEach((control) => {
+      form.querySelectorAll(`[name="${name}"]`).forEach((control) => {
         console.log(`Setting control ${name} to value ${value}`);
         control.dataset["radio_set_value"] = value;
         if (control.type === 'radio') control.checked = control.value === String(value);
         if(control.type === 'checkbox') control.checked = !!value;
         else control.value = String(value);
+      });
+    }
+
+    function highlightFactoryDefaultVariations() {
+      const form = document.querySelector('#gt5rSettingsForm');
+      form.querySelectorAll('[data-factory_default]').forEach((control) => {
+        const factoryDefault = control.dataset["factory_default"];
+        if (control.value === factoryDefault) {
+          control.classList.remove('not-factory-default');
+        } else {
+          control.classList.add('not-factory-default');
+        }
+      });
+    }
+    function highlightChanges(){
+      const form = document.querySelector('#gt5rSettingsForm');
+      form.querySelectorAll('[data-radio_set_value]').forEach((control) => {
+        const radioSetValue = control.dataset["radio_set_value"];
+        if (control.value === radioSetValue) {
+          control.classList.remove('changed');
+        } else {
+          control.classList.add('changed');
+        }
       });
     }
 
