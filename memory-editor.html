@@ -1634,7 +1634,7 @@ let visible = 0;
               </td>
               <td></td>
             </tr>
-            
+            <tr><th colspan='4'>Service calibration threshold for ${band.toLowerCase()} squelch level ${index}. Change only when calibrating the receiver with appropriate test equipment.</th></tr>
             <script>
               ["VHF","UHF"].forEach(band => {
                 document.write("<tr><th colspan='4'>" + band + " Squelch</th></tr>")
@@ -1643,8 +1643,8 @@ let visible = 0;
                   <tr id="settings-${band.toLowerCase()}-squelch-${index}">
                     <td class="channel">${index}</td>
                     <td class="squelch">${band} Squelch ${index}</td>
-                    <td><input type="text" name="settings-${band.toLowerCase()}-squelch-${index}" /></td>
-                    <td>0-123</td>
+                    <td><input type="number" min="0" max="123" name="settings-${band.toLowerCase()}-squelch-${index}" /></td>
+                    <td></td>
                   </tr>
                   `);
                 });
