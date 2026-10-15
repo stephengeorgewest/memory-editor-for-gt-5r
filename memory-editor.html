@@ -766,7 +766,6 @@
       <h1>Memory editor</h1>
       <p class="subtitle">for Baofeng GT-5R radio.</p>
     </div>
-    <button id="theme" class="secondary" type="button">Theme: auto</button>
   </header>
   <main>
     <section class="memory-visualization actions">
@@ -1755,7 +1754,6 @@ let visible = 0;
 
     let sourceMemories = [];
     let fileName = 'chirp-export.csv';
-    let theme = localStorage.getItem('chirp-theme') || 'auto';
 
 
     function render() {
@@ -1768,8 +1766,6 @@ let visible = 0;
     }
 
     function bindEvents() {
-      document.querySelector('#theme').addEventListener('click', cycleTheme);
-
       document.querySelectorAll(".collapse-indicator").forEach((section) => section.addEventListener('click', (event) =>{
         event.stopPropagation();
         if(event.target.dataset.collapseTarget) {
@@ -1951,16 +1947,6 @@ I guess just let the error happen.*/
     function showStatus(message, section = '#memory') {
       const notice = document.querySelector(section + "-status");
       notice.textContent = message;
-    }
-    
-    function applyTheme() {
-      document.documentElement.style.colorScheme = theme === 'auto' ? 'light dark' : theme;
-      document.querySelector('#theme').textContent = `Theme: ${theme}`;
-      if (typeof drawDeviceMemory === 'function') drawDeviceMemory();
-    }
-    
-    function cycleTheme() {
-      theme = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto'; localStorage.setItem('chirp-theme', theme); applyTheme();
     }
 
     function downloadCsv() {
@@ -2891,7 +2877,6 @@ I guess just let the error happen.*/
     function gt5rFreqOffset(units) { return (units / 1e6).toFixed(6); }
 
     bindEvents();
-    applyTheme();
   </script>
 </body>
 
