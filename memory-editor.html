@@ -494,24 +494,35 @@
       color: inherit;
       font: inherit;
       padding: .25rem .15rem;
-      width: 100%;
+      width: calc(100% - 0.5rem);
     }
-    td:has(>.changed)::after, td:has(>.not-factory-default)::after {
+    td:has(>input), td:has(>select), td:has(>label> input) {
+      position: relative;
+    }
+    td:has(>.changed)::after, td:has(>.not-factory-default)::after,
+    td:has(>label >.changed)::after {
       position: absolute;
+      right: 0.2rem;
+    }
+    td:has(>label> input[type="radio"].changed)::after,
+    td:has(>label> input[type="radio"].not-factory-default)::after {
+      top: 50%;
     }
     td:has(>.not-factory-default)::after {
       content: "†";
       color: var(--warning);
     }
-    td:has(>.changed)::after {
+    td:has(>.changed)::after,
+    td:has(>label >.changed)::after {
       content: "*";
     }
     td:has(>.changed.not-factory-default)::after {
-      content: "*†";
+      content: "*\A†";
+      white-space: pre;
     }
     th.name,td.name {
-      width: 5rem;
-      min-width: 5rem;
+      width: 5.5rem;
+      min-width: 5.5rem;
       padding-left: 0.2rem
     }
     th.rx, th.tx, td.rx, td.tx {
@@ -960,10 +971,10 @@ let visible = 0;
                   <tr><th>VFO-A</th><th>VFO-B</th></tr>
                   <tr><td>
                     <label><input type="radio" name="vfo-a-txpower" value="0" /> LOW [0]</label>
-                <label><input type="radio" name="vfo-a-txpower" value="1" /> HIGH [1]</label>
+                    <label><input type="radio" name="vfo-a-txpower" value="1" /> HIGH [1]</label>
                   </td><td>
                     <label><input type="radio" name="vfo-b-txpower" value="0" /> LOW [0]</label>
-                <label><input type="radio" name="vfo-b-txpower" value="1" /> HIGH [1]</label>
+                    <label><input type="radio" name="vfo-b-txpower" value="1" /> HIGH [1]</label>
                   </td></tr>
                 </table>
               </td>
@@ -1643,7 +1654,7 @@ let visible = 0;
               <td>--</td>
               <td>DTMF Off</td>
               <td>
-                <input type="number" min="0" max="19" step="1" list="DTMF-Speed-datalist" name="settings-dtmf-off" value="" data-factory_default="3" />
+                <input type="number" min="0" max="195" step="1" list="DTMF-Speed-datalist" name="settings-dtmf-off" value="" data-factory_default="3" />
               </td>
               <td></td>
             </tr>
@@ -2509,7 +2520,7 @@ I guess just let the error happen.*/
         console.log(`Setting control ${name} to value ${value}`);
         control.dataset["radio_set_value"] = value;
         if (control.type === 'radio') control.checked = control.value === String(value);
-        if(control.type === 'checkbox') control.checked = !!value;
+        else if(control.type === 'checkbox') control.checked = !!value;
         else control.value = String(value);
       });
     }
@@ -2518,7 +2529,11 @@ I guess just let the error happen.*/
       const form = document.querySelector('#gt5rSettingsForm');
       form.querySelectorAll('[data-factory_default]').forEach((control) => {
         const factoryDefault = control.dataset["factory_default"];
-        if (control.value === factoryDefault) {
+        if (
+          control.type.toLowerCase() === 'checkbox'
+            ? control.checked === (factoryDefault === 'true')
+            : control.value === factoryDefault
+        ) {
           control.classList.remove('not-factory-default');
         } else {
           control.classList.add('not-factory-default');
@@ -2529,7 +2544,15 @@ I guess just let the error happen.*/
       const form = document.querySelector('#gt5rSettingsForm');
       form.querySelectorAll('[data-radio_set_value]').forEach((control) => {
         const radioSetValue = control.dataset["radio_set_value"];
-        if (control.value === radioSetValue) {
+        if (
+          control.type.toLowerCase() === 'checkbox' 
+          ? control.checked === (radioSetValue === 'true') 
+          : control.type.toLowerCase() == 'radio' && control.checked
+          ? radioSetValue === control.value
+          : control.type.toLowerCase() == 'radio' && !control.checked
+          ? radioSetValue !== control.value
+          : control.value === radioSetValue
+        ) {
           control.classList.remove('changed');
         } else {
           control.classList.add('changed');
