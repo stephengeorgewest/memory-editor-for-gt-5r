@@ -753,6 +753,7 @@
       <button id="write-serial" class="primary" disabled>Write to GT-5R</button>
       <button id="read-serial" class="secondary read-serial" type="button">Read from GT-5R</button>
     </section>
+    <form id="gt5rSettingsForm">
     <section class="table-section">
       <div class="table-heading">
         <div>
@@ -805,7 +806,7 @@ Array(GT5R_CHANNEL_COUNT).fill().map((_, i) => {
   memoryHeaders.forEach((header) => {
     const td = document.createElement('td');
     td.className = header;
-    td.innerHTML =  `<input data-field="${header}"
+    td.innerHTML =  `<input name="channel-${i}-${header}" data-field="${header}"
     list="${header.endsWith('ToneValue') ? 'ToneValue' : header}-datalist"
     type="${
       /*header === 'name'
@@ -887,7 +888,6 @@ let visible = 0;
             table { width: 100%; }
           }
         </style>
-        <form id="gt5rSettingsForm">
         <table id="radio-settings">
           <thead>
             <tr>
@@ -1652,10 +1652,9 @@ let visible = 0;
             </script>
           </tbody>
         </table>
-        </form>
       </section>
     </section>
-
+   </form>
     <section class="table-section">
       <div class="table-heading">
         <div>
@@ -2233,48 +2232,13 @@ I guess just let the error happen.*/
               const headerToChannelData = []
               if(channelData) {
                 // rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan
-                const tr = document.querySelector(`[data-location="${channelIndex}"]`);
-                const frequencyField = tr?.querySelector('[data-field="Frequency"]');
-                if (frequencyField) frequencyField.value = /*gt5rFreq(*/channelData.rxRaw/*)*/;
-
-                const duplexField = tr?.querySelector('[data-field="rxFrequency"]');
-                if (duplexField) duplexField.value =  channelData.rxRaw;
-
-                const offsetField = tr?.querySelector('[data-field="txFrequency"]');
-                if (offsetField) offsetField.value =  channelData.txRaw;
-
-                const rxToneField = tr?.querySelector('[data-field="rxToneValue"]');
-                if (rxToneField) rxToneField.value = channelData.rxToneValue;
-
-                const txToneField = tr?.querySelector('[data-field="txToneValue"]');
-                if (txToneField) txToneField.value = channelData.txToneValue;
-
-               /* const rToneFreqField = tr?.querySelector('[data-field="rToneFreq"]');
-                if (rToneFreqField) rToneFreqField.value = channelData.rTone?.toFixed(1) ?? '';
-
-                const cToneFreqField = tr?.querySelector('[data-field="cToneFreq"]');
-                if (cToneFreqField) cToneFreqField.value = channelData.cTone?.toFixed(1)?? '';
-
-                const dtcsCodeField = tr?.querySelector('[data-field="DtcsCode"]');
-                if (dtcsCodeField) dtcsCodeField.value = channelData.dtcsCode ? String(channelData.dtcsCode).padStart(3, 0) ?? '' : '';
-
-                const DtcsPolarityField = tr?.querySelector('[data-field="DtcsPolarity"]');
-                if (DtcsPolarityField) DtcsPolarityField.value = channelData.pol.join('');
-
-                const RxDtcsCodeField = tr?.querySelector('[data-field="RxDtcsCode"]');
-                if (RxDtcsCodeField) RxDtcsCodeField.value = channelData.rxDtcsCode ? String(channelData.rxDtcsCode).padStart(3, 0) ?? '': '';
-
-                const CrossModeField = tr?.querySelector('[data-field="CrossMode"]');
-                if (CrossModeField) CrossModeField.value = channelData.crossMode;
-                */
-                const ModeField = tr?.querySelector('[data-field="wide"]');
-                if (ModeField) ModeField.checked = !!channelData.wide;
-
-                const SkipField = tr?.querySelector('[data-field="scan"]');
-                if (SkipField) SkipField.checked = !!channelData.scan;
-
-                const PowerField = tr?.querySelector('[data-field="lowpower"]');
-                if (PowerField) PowerField.checked = !!channelData.lowpower;
+                setControlValue("channel-" + channelIndex + "-rxFrequency", channelData.rxRaw);
+                setControlValue("channel-" + channelIndex + "-txFrequency", channelData.txRaw);
+                setControlValue("channel-" + channelIndex + "-rxToneValue", channelData.rxToneValue);
+                setControlValue("channel-" + channelIndex + "-txToneValue", channelData.txToneValue);
+                setControlValue("channel-" + channelIndex + "-wide", channelData.wide);
+                setControlValue("channel-" + channelIndex + "-scan", channelData.scan);
+                setControlValue("channel-" + channelIndex + "-lowpower", channelData.lowpower);
 
                 visibleChannels();
               }
@@ -2344,11 +2308,8 @@ I guess just let the error happen.*/
 
               const channelIndex = (addr - CHANNEL_MEMORY_NAMES_START) / CHUNK_SIZE * 4 + channelInChunk;
               const nameData = gt5rDecodeChannelNameFromBlock(channelSubarray);
-              if (!nameData) continue;
 
-              const tr = document.querySelector(`[data-location="${channelIndex}"]`);
-              const nameField = tr?.querySelector('[data-field="name"]');
-              if (nameField) nameField.value = nameData ? nameData.trim() : '';
+              setControlValue(`channel-${channelIndex}-name`, nameData ? nameData.trim() : '');
             
               visibleChannels();
             }
@@ -2518,7 +2479,10 @@ I guess just let the error happen.*/
     function setControlValue(name, value) {
       const form = document.querySelector('#gt5rSettingsForm');
       form.querySelectorAll(`[name="${name}"], #${name}`).forEach((control) => {
+        console.log(`Setting control ${name} to value ${value}`);
+        control.dataset["radio_set_value"] = value;
         if (control.type === 'radio') control.checked = control.value === String(value);
+        if(control.type === 'checkbox') control.checked = !!value;
         else control.value = String(value);
       });
     }
