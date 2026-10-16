@@ -75,7 +75,6 @@
       'name', // 7bytes
       'rxFrequency', // 4bytes 10hz resolution? manual entry only allows for 0.25kHz increments via the 6.25kHz step
       'txFrequency', // 4bytes (above) or FFFFFFFF (unset?/ tx is rx/ duplex off offset=0)
-      //'isTxInh',
       'rxToneValue', // 2bytes
       'txToneValue', // 2bytes
       'lowpower',  //bit
@@ -403,6 +402,10 @@
       box-shadow: 6px 6px 0 var(--shadow);
       overflow: auto;
     }
+    .table-section:not(.collapsed) #gt5r-channel-table,
+    .table-section:not(.collapsed) #cvs-channel-table {
+      min-height:15rem;
+    }
 
     table {
       border-collapse: collapse;
@@ -429,7 +432,8 @@
     th.action div{
       position: relative;
     }
-    th.action div div#copy-options-container{
+    th.action div div#copy-options-container,
+    th.action div div#copy-options-container-gt5r {
       position:absolute;
       right: 0;
       display:none;
@@ -438,7 +442,8 @@
       border: 1px solid var(--line);
       padding: .5rem;
     }
-    th.action div div#copy-options-container[open] {
+    th.action div div#copy-options-container[open],
+    th.action div div#copy-options-container-gt5r[open] {
       display: flex;
     }
 
@@ -773,7 +778,7 @@
         <canvas id="device-memory"></canvas>
         <p id="memory-status" role="status">Editable channels ready for export.</p>
       </div>
-      <button id="write-serial" class="primary" disabled>Write to GT-5R</button>
+      <button id="write-serial" class="primary" type="button" disabled>Write to GT-5R</button>
       <button id="read-serial" class="secondary read-serial" type="button">Read from GT-5R</button>
     </section>
     <form id="gt5rSettingsForm">
@@ -795,10 +800,10 @@
         </div>
 
         <div class="actions">
-          <button id="export" class="primary">Export CSV</button>
+          <button id="export" class="primary" type="button">Export CSV</button>
         </div>
       </section>
-      <section class="grid-shell">
+      <section class="grid-shell" id="gt5r-channel-table">
         <table>
           <thead>
             <tr>
@@ -808,7 +813,24 @@
                   document.write(`<th class="${header}">${header}</th>`);
                 });
               </script>
-              <th class="action"></th>
+              <th class="action"><div>
+                <button id="copy-all-gt5r" class="tertiary" type="button">Copy all</button>
+                <button id="copy-selected-gt5r" class="tertiary" type="button" disabled>Copy selected</button>
+                <button id="copy-options-gt5r" class="tertiary" type="button" title="Copy Options">⌥</button>
+                <div id="copy-options-container-gt5r">
+                  <label><select id="copy-destination-gt5r">
+                    <option value="">--</option>
+                    <script>document.addEventListener('DOMContentLoaded', function() {
+                      const copyDestination = document.querySelector('#copy-destination-gt5r');
+                      for (let channel = 0; channel < GT5R_CHANNEL_COUNT; channel++) {
+                        copyDestination.add(new Option(channel, channel));
+                      }
+                      copyDestination.value = '';
+                    });</script>
+                  </select> Copy Destination</label>
+                  <label title="Copy selected channels without gaps"><input type="checkbox" id="copy-contiguously-gt5r" /> Copy contiguously</label>
+                </div></div>
+              </th>
             </tr>
           </thead>
           <tbody id="table-body">
@@ -856,10 +878,7 @@ let visible = 0;
     const isMatchingChannel = !query || row.dataset.location.toLowerCase().includes(query);
 
     const dataFields = row.querySelectorAll("[data-field]");
-    const allEmptyFields = hideEmpty && Array.from(dataFields).every((field) => {
-      const defaultValue = choices[field.dataset.field]?.[0] ?? '';
-      return field.dataset.field === 'lowpower' || field.dataset.field === 'wide' || field.dataset.field === 'scan' ? !field.checked : field.value === '';
-    });
+    const allEmptyFields = hideEmpty && allFieldsEmpty(dataFields);
     const hasMatchingField = !query || Array.from(dataFields).some((field) => {
       return field.value.toLowerCase().includes(query);
     });
@@ -872,7 +891,13 @@ let visible = 0;
   });
   document.querySelector('#visible-count').textContent = visible;
 };
-            </script>
+function allFieldsEmpty(dataFields){
+  const allEmptyFields = Array.from(dataFields).filter((field) => field.dataset.field !== 'name').every((field) => {
+    const defaultValue = choices[field.dataset.field]?.[0] ?? '';
+    return field.dataset.field === 'lowpower' || field.dataset.field === 'wide' || field.dataset.field === 'scan' ? !field.checked : field.value === '';
+  });
+  return allEmptyFields;
+}</script>
           </tbody>
         </table>
       </section>
@@ -1671,7 +1696,7 @@ let visible = 0;
                   <tr id="settings-${band}-squelch-${index}">
                     <td class="channel">${index}</td>
                     <td class="squelch">${band} Squelch ${index}</td>
-                    <td><input type="number" min="0" max="123" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
+                    <td><input type="number" min="0" max="124" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
                     <td>Factory Default?: ${factorySquelch[band][index]}</td>
                   </tr>
                   `);
@@ -1695,7 +1720,7 @@ let visible = 0;
         </div>
         <div class="collapse-indicator">></div>
       </div>
-      <section class="grid-shell source-shell">
+      <section class="grid-shell source-shell" id="cvs-channel-table">
         <table>
           <thead>
             <tr>
@@ -1787,20 +1812,27 @@ let visible = 0;
 
       document.querySelector('#import').addEventListener('change', importCsv);
       document.querySelector('#copy-all').addEventListener('click', copyAllSources);
+      document.querySelector('#copy-all-gt5r').addEventListener('click', gt5rParseImage);
       document.querySelector('#copy-selected').addEventListener('click', copySelectedSources);
 
-      document.querySelector('#copy-options').addEventListener('click', (event) => {
+      ["", "-gt5r"].forEach(suffix => {
+        document.querySelector('#copy-options' + suffix).addEventListener('click', (event) => {
         event.stopPropagation();
-        const container = document.querySelector('#copy-options-container');
+          event.preventDefault();
+          const container = document.querySelector('#copy-options-container' + suffix);
         container.hasAttribute("open") ? container.removeAttribute("open") : container.setAttribute("open", "");
+        });
       });
       document.body.addEventListener('click', (event) => {
-        const container = document.querySelector('#copy-options-container');
+        ["", "-gt5r"].forEach(suffix => {
+          const container = document.querySelector('#copy-options-container' + suffix);
         if (!container.contains(event.target) && container.hasAttribute("open")) {
           container.removeAttribute("open");
         }
       });
-      document.querySelector("label:has(#copy-destination)").addEventListener('click', (event) => {
+      });
+      ['', '-gt5r'].forEach(suffix => {
+        document.querySelector("label:has(#copy-destination" + suffix + ")").addEventListener('click', (event) => {
         /*prevent default prevents
 
         index.html:653 Uncaught NotAllowedError: Failed to execute 'showPicker' on 'HTMLSelectElement': showPicker() requires a user gesture.
@@ -1816,7 +1848,8 @@ I guess just let the error happen.*/
         //event.preventDefault();
         //this.focus();
         //document.querySelector("label:has(#copy-destination)")
-        document.getElementById('copy-destination').showPicker();
+          document.getElementById('copy-destination' + suffix).showPicker();
+        });
       });
 
       const readSerialButton = document.querySelector('#read-serial');
@@ -1988,8 +2021,11 @@ I guess just let the error happen.*/
         document.querySelector('#source-status').textContent = `${sourceMemories.length} read-only channels from ${file.name}`;
         fileName = file.name.replace(/\.csv$/i, '') + '-edited.csv';
         render();
-        showStatus(`${sourceMemories.length} channels ready to copy`, '#memory');
-      }).catch((error) => showStatus(error.message, '#memory'));
+        showStatus(`${sourceMemories.length} channels ready to copy`, '#source');
+      }).catch((error) => {
+        showStatus(error.message, '#source');
+        console.log(error);
+      });
     }
 
     function importedLocationClick(event) {
@@ -2076,6 +2112,7 @@ I guess just let the error happen.*/
       } catch (error) {
         document.querySelector('#radio-settings-status').textContent = `Settings read failed: ${error.message || 'serial error'}`;
         showStatus(error.message || 'Failed to read from radio', "#memory");
+        console.log(error)
       } finally {
         try { await port.close(); } catch (error) { /* already closed */ }
         readSerialButton.disabled = false;
@@ -2249,11 +2286,11 @@ I guess just let the error happen.*/
               const channelSubarray = chunk.subarray(channelInChunk*CHANNEL_SIZE, channelInChunk*CHANNEL_SIZE + CHANNEL_SIZE);
 
               const channelIndex = chunkIndex * 4 + channelInChunk;
-              const channelData = gt5rDecodeChannelDataFromBlockSegment(channelSubarray) ?? { rxRaw: "", txRaw: "", isTxInh: undefined, rxToneValue: "", txToneValue: "", lowpower: "", wide: "", scan: "" };
+              const channelData = gt5rDecodeChannelDataFromBlockSegment(channelSubarray) ?? { rxRaw: "", txRaw: "", rxToneValue: "", txToneValue: "", lowpower: "", wide: "", scan: "" };
 
               const headerToChannelData = []
               if(channelData) {
-                // rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan
+                // rxRaw, txRaw, rxtoneVal, txtoneVal, lowpower, wide, scan
                 setControlValue("channel-" + channelIndex + "-rxFrequency", channelData.rxRaw);
                 setControlValue("channel-" + channelIndex + "-txFrequency", channelData.txRaw);
                 setControlValue("channel-" + channelIndex + "-rxToneValue", channelData.rxToneValue);
@@ -2485,17 +2522,12 @@ I guess just let the error happen.*/
      * Decode the channel data from the GT-5R radio data.
      */
     function gt5rParseImage() {
-      // create a single array of the length of the chunks combined
-      const data = new Uint8Array(deviceMemory.reduce((sum, chunk) => sum + chunk.length, 0));
-      let offset = 0;
-      // copy each chunk into the combined data array
-      for (const chunk of deviceMemory) { data.set(chunk, offset); offset += chunk.length; }
-
       const channels = [];
-      for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
+      for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(index); if (memory) channels.push(memory); }
       sourceMemories = channels;
       fileName = 'gt5r-read.csv';
       showStatus(`${sourceMemories.length} channels read from GT-5R.`, "#source");
+      render();
     }
 
     function setControlValue(name, value) {
@@ -2722,14 +2754,20 @@ I guess just let the error happen.*/
      * @param {number} index - The channel index.
      * @returns {object|null} The decoded channel data, or null if the channel is empty.
      */
-    function gt5rDecodeChannel(data, index) {
-      const memOffset = 0x0000 + index * 16;
-      const rec = data.subarray(memOffset, memOffset + 16);
-      const channelData = gt5rDecodeChannelDataFromBlockSegment(rec);
-
-      if(!channelData) return null;
-
-      const { rxRaw, txRaw, isTxInh, rxToneValue, txToneValue, lowpower, wide, scan } = channelData;
+    function gt5rDecodeChannel(index) {
+      const row = document.querySelector(`[data-location="${index}"]`);
+      const dataFields = row.querySelectorAll("[data-field]");
+      if(allFieldsEmpty(dataFields)) return;
+      
+      const rxRaw = parseInt(row.querySelector('[name=channel-' + index + '-rxFrequency]').value, 10);
+      const txRaw = parseInt(row.querySelector('[name=channel-' + index + '-txFrequency]').value, 10);
+      //const isTxInh = row.querySelector('[name=channel-' + index + '-tx-inhibit]').checked;
+      const isTxInh = txRaw === 0xFFFFFFFF;//rec[4] === 0xff && rec[5] === 0xff && rec[6] === 0xff && rec[7] === 0xff;
+      const rxToneValue = parseInt(row.querySelector('[name=channel-' + index + '-rxToneValue]').value, 10);
+      const txToneValue = parseInt(row.querySelector('[name=channel-' + index + '-txToneValue]').value, 10);
+      const lowpower = row.querySelector('[name=channel-' + index + '-lowpower]').checked;
+      const wide = row.querySelector('[name=channel-' + index + '-wide]').checked;
+      const scan = row.querySelector('[name=channel-' + index + '-scan]').checked;
 
       let duplex = '', offset = 0;
       if (isTxInh) { duplex = 'off'; offset = 0; }
@@ -2755,7 +2793,7 @@ I guess just let the error happen.*/
       else if (txmode === rxmode && txmode === 'DTCS' && dtcsCode === rxDtcsCode) tmode = 'DTCS';
       else if (rxmode || txmode) { tmode = 'Cross'; crossMode = `${txmode}->${rxmode}`; }
       
-      const name = gt5rDecodeChannelName(data, index);
+      const name = row.querySelector('[name=channel-' + index + '-name]').value;
 
       return makeMemory({
         Location: index,
@@ -2786,14 +2824,13 @@ I guess just let the error happen.*/
      * The last 4 bytes contain the power, wide, scan, and duplex settings.
      * 
      * @param {Uint8Array} rec - The 16-byte block segment containing the channel data.
-     * @returns {{rxRaw: number, txRaw: number, isTxInh: boolean, rxToneValue: number, txToneValue: number, lowpower: number, wide: number, scan: number}|null} The decoded channel data, or null if the channel is empty.
+     * @returns {{rxRaw: number, txRaw: number: boolean, rxToneValue: number, txToneValue: number, lowpower: number, wide: number, scan: number}|null} The decoded channel data, or null if the channel is empty.
      */
     function gt5rDecodeChannelDataFromBlockSegment(rec) {
       if (rec[0] === 0xff) return null;
 
       const rxRaw = gt5rLbcd4(rec.subarray(0, 4));
       const txRaw = gt5rLbcd4(rec.subarray(4, 8));
-      const isTxInh = rec[4] === 0xff && rec[5] === 0xff && rec[6] === 0xff && rec[7] === 0xff;
       const rxToneValue = rec[8] | (rec[9] << 8);
       const txToneValue = rec[10] | (rec[11] << 8);
       const lowpower = rec[14] & 0x03;
@@ -2803,7 +2840,6 @@ I guess just let the error happen.*/
       return {
         rxRaw,
         txRaw,
-        isTxInh,
         rxToneValue,
         txToneValue,
         lowpower,
