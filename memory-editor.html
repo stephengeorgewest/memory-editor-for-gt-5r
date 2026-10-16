@@ -2070,10 +2070,9 @@ I guess just let the error happen.*/
         });
 
         gt5rParseImage();
-        showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#memory");
-        fileName = 'gt5r-read.csv';
+        showStatus('GT-5R read successfully.', "#memory");
+
         render();
-        showStatus(`${sourceMemories.length} channels read from GT-5R`, "#memory");
       } catch (error) {
         document.querySelector('#radio-settings-status').textContent = `Settings read failed: ${error.message || 'serial error'}`;
         showStatus(error.message || 'Failed to read from radio', "#memory");
@@ -2495,6 +2494,8 @@ I guess just let the error happen.*/
       const channels = [];
       for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
       sourceMemories = channels;
+      fileName = 'gt5r-read.csv';
+      showStatus(`${sourceMemories.length} channels read from GT-5R.`, "#source");
     }
 
     function setControlValue(name, value) {
@@ -2722,41 +2723,6 @@ I guess just let the error happen.*/
      * @returns {object|null} The decoded channel data, or null if the channel is empty.
      */
     function gt5rDecodeChannel(data, index) {
-      const channelData = gt5rDecodeChannelData(data, index);
-      if (!channelData) return null;
-      const { rxRaw, txRaw, isTxInh, rxtoneVal, txtoneVal, lowpower, wide, scan, duplex, offset, pol, txmode, rtone, dtcsCode, rxmode, ctone, rxDtcsCode, tmode, crossMode } = channelData;
-      
-      const name = gt5rDecodeChannelName(data, index);
-
-      return makeMemory({
-        Location: index,
-        Name: name.trimEnd(),
-        Frequency: gt5rFreq(rxRaw),
-        Duplex: duplex,
-        Offset: gt5rFreqOffset(offset),
-        Tone: tmode,
-        rToneFreq: rtone !== null ? rtone.toFixed(1) : '',
-        cToneFreq: ctone !== null ? ctone.toFixed(1) : '',
-        DtcsCode: dtcsCode !== null ? String(dtcsCode).padStart(3, '0') : '',
-        DtcsPolarity: pol.join(''),
-        RxDtcsCode: rxDtcsCode !== null ? String(rxDtcsCode).padStart(3, '0') : '',
-        CrossMode: crossMode,
-        Mode: wide ? 'FM' : 'NFM',
-        TStep: '',
-        Skip: scan ? '' : 'S',
-        Power: lowpower === 1 ? 'Low' : 'High',
-        Comment: '',
-      });
-    }
-
-    /**
-     * Decode the channel data from the GT-5R radio memory.
-     * Each channel's data is stored in a 16-byte block.
-     * @param {Uint8Array} data - The raw data from the radio.
-     * @param {number} index - The channel index.
-     * @returns {object|null} The decoded channel data, or null if the channel is empty.
-     */
-    function gt5rDecodeChannelData(data, index) {
       const memOffset = 0x0000 + index * 16;
       const rec = data.subarray(memOffset, memOffset + 16);
       const channelData = gt5rDecodeChannelDataFromBlockSegment(rec);
@@ -2788,22 +2754,30 @@ I guess just let the error happen.*/
       else if (txmode === rxmode && txmode === 'Tone' && rtone === ctone) tmode = 'TSQL';
       else if (txmode === rxmode && txmode === 'DTCS' && dtcsCode === rxDtcsCode) tmode = 'DTCS';
       else if (rxmode || txmode) { tmode = 'Cross'; crossMode = `${txmode}->${rxmode}`; }
+      
+      const name = gt5rDecodeChannelName(data, index);
 
-      return {
-        ...channelData,
-        duplex,
-        offset,
-        pol,
-        txmode,
-        rtone,
-        dtcsCode,
-        rxmode,
-        ctone,
-        rxDtcsCode,
-        tmode,
-        crossMode,
-      };
+      return makeMemory({
+        Location: index,
+        Name: name.trimEnd(),
+        Frequency: gt5rFreq(rxRaw),
+        Duplex: duplex,
+        Offset: gt5rFreqOffset(offset),
+        Tone: tmode,
+        rToneFreq: rtone !== null ? rtone.toFixed(1) : '',
+        cToneFreq: ctone !== null ? ctone.toFixed(1) : '',
+        DtcsCode: dtcsCode !== null ? String(dtcsCode).padStart(3, '0') : '',
+        DtcsPolarity: pol.join(''),
+        RxDtcsCode: rxDtcsCode !== null ? String(rxDtcsCode).padStart(3, '0') : '',
+        CrossMode: crossMode,
+        Mode: wide ? 'FM' : 'NFM',
+        TStep: '',
+        Skip: scan ? '' : 'S',
+        Power: lowpower === 1 ? 'Low' : 'High',
+        Comment: '',
+      });
     }
+
     /**
      * Decode the channel data from a 16-byte block segment.
      * 
