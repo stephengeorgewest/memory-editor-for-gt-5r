@@ -1671,8 +1671,8 @@ let visible = 0;
                   <tr id="settings-${band}-squelch-${index}">
                     <td class="channel">${index}</td>
                     <td class="squelch">${band} Squelch ${index}</td>
-                    <td><input type="number" min="0" max="124" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
-                    <td>Factory Default?: ${factorySquelch[band][index]}, max allowed in chirp: 123</td>
+                    <td><input type="number" min="0" max="123" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
+                    <td>Factory Default?: ${factorySquelch[band][index]}</td>
                   </tr>
                   `);
                 });
