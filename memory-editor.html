@@ -2547,7 +2547,7 @@ I guess just let the error happen.*/
         const factoryDefault = control.dataset["factory_default"];
         if (
           control.type.toLowerCase() === 'checkbox'
-            ? control.checked === (factoryDefault === 'true')
+            ? control.checked === (factoryDefault === '1')
             : control.value === factoryDefault
         ) {
           control.classList.remove('not-factory-default');
@@ -2562,7 +2562,7 @@ I guess just let the error happen.*/
         const radioSetValue = control.dataset["radio_set_value"];
         if (
           control.type.toLowerCase() === 'checkbox' 
-          ? control.checked === (radioSetValue === 'true') 
+          ? control.checked === (radioSetValue === '1') 
           : control.type.toLowerCase() == 'radio' && control.checked
           ? radioSetValue === control.value
           : control.type.toLowerCase() == 'radio' && !control.checked
