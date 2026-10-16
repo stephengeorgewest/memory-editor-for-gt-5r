@@ -2062,11 +2062,18 @@ I guess just let the error happen.*/
         readSerialButton.disabled = true;
         readSerialButton.style.setProperty('--progress', '0%');
 
-        const data = await gt5rDownload(byteReader, (done, total) => {
+        const chunks = await gt5rDownload(byteReader, (done, total) => {
           const progress = Math.round((done / total) * 100);
           showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#memory");
           readSerialButton.style.setProperty('--progress', `${progress}%`);
         });
+
+        // create a single array of the length of the chunks combined
+        const data = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+        let offset = 0;
+        // copy each chunk into the combined data array
+        for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+
         sourceMemories = gt5rParseImage(data);
         showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#memory");
         fileName = 'gt5r-read.csv';
@@ -2409,13 +2416,7 @@ I guess just let the error happen.*/
         highlightFactoryDefaultVariations();
         highlightChanges();
         
-        // create a single array of the length of the chunks combined
-        const data = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
-        let offset = 0;
-        // copy each chunk into the combined data array
-        for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
-        //drawDeviceMemory();
-        return data;
+        return chunks;
       } finally {
         try { await byteReader.reader.cancel(); } catch (error) { /* ignore */ }
         byteReader.reader.releaseLock();
