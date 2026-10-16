@@ -1671,8 +1671,8 @@ let visible = 0;
                   <tr id="settings-${band}-squelch-${index}">
                     <td class="channel">${index}</td>
                     <td class="squelch">${band} Squelch ${index}</td>
-                    <td><input type="number" min="0" max="123" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
-                    <td>Factory Default?: ${factorySquelch[band][index]}</td>
+                    <td><input type="number" min="0" max="124" name="settings-${band}-squelch-${index}" data-factory_default="${factorySquelch[band][index]}" /></td>
+                    <td>Factory Default?: ${factorySquelch[band][index]}, max allowed in chirp: 123</td>
                   </tr>
                   `);
                 });
@@ -2248,8 +2248,7 @@ I guess just let the error happen.*/
               const channelSubarray = chunk.subarray(channelInChunk*CHANNEL_SIZE, channelInChunk*CHANNEL_SIZE + CHANNEL_SIZE);
 
               const channelIndex = chunkIndex * 4 + channelInChunk;
-              const channelData = gt5rDecodeChannelDataFromBlockSegment(channelSubarray);
-              if (!channelData) continue;
+              const channelData = gt5rDecodeChannelDataFromBlockSegment(channelSubarray) ?? { rxRaw: "", txRaw: "", isTxInh: undefined, rxToneValue: "", txToneValue: "", lowpower: "", wide: "", scan: "" };
 
               const headerToChannelData = []
               if(channelData) {
@@ -2762,29 +2761,11 @@ I guess just let the error happen.*/
     function gt5rDecodeChannelData(data, index) {
       const memOffset = 0x0000 + index * 16;
       const rec = data.subarray(memOffset, memOffset + 16);
-      return gt5rDecodeChannelDataFromBlockSegment(rec);
-    }
-    /**
-     * Decode the channel data from a 16-byte block segment.
-     * 
-     * The first 8 bytes contain the RX and TX frequencies.
-     * The next 4 bytes contain the tone information.
-     * The last 4 bytes contain the power, wide, scan, and duplex settings.
-     * 
-     * @param {Uint8Array} rec - The 16-byte block segment containing the channel data.
-     * @returns {object|null} The decoded channel data, or null if the channel is empty.
-     */
-    function gt5rDecodeChannelDataFromBlockSegment(rec) {
-      if (rec[0] === 0xff) return null;
+      const channelData = gt5rDecodeChannelDataFromBlockSegment(rec);
 
-      const rxRaw = gt5rLbcd4(rec.subarray(0, 4));
-      const txRaw = gt5rLbcd4(rec.subarray(4, 8));
-      const isTxInh = rec[4] === 0xff && rec[5] === 0xff && rec[6] === 0xff && rec[7] === 0xff;
-      const rxToneValue = rec[8] | (rec[9] << 8);
-      const txToneValue = rec[10] | (rec[11] << 8);
-      const lowpower = rec[14] & 0x03;
-      const wide = (rec[15] >> 6) & 0x1;
-      const scan = (rec[15] >> 2) & 0x1;
+      if(!channelData) return null;
+
+      const { rxRaw, txRaw, isTxInh, rxToneValue, txToneValue, lowpower, wide, scan } = channelData;
 
       let duplex = '', offset = 0;
       if (isTxInh) { duplex = 'off'; offset = 0; }
@@ -2811,14 +2792,7 @@ I guess just let the error happen.*/
       else if (rxmode || txmode) { tmode = 'Cross'; crossMode = `${txmode}->${rxmode}`; }
 
       return {
-        rxRaw,
-        txRaw,
-        isTxInh,
-        rxToneValue,
-        txToneValue,
-        lowpower,
-        wide,
-        scan,
+        ...channelData,
         duplex,
         offset,
         pol,
@@ -2830,7 +2804,40 @@ I guess just let the error happen.*/
         rxDtcsCode,
         tmode,
         crossMode,
-      }
+      };
+    }
+    /**
+     * Decode the channel data from a 16-byte block segment.
+     * 
+     * The first 8 bytes contain the RX and TX frequencies.
+     * The next 4 bytes contain the tone information.
+     * The last 4 bytes contain the power, wide, scan, and duplex settings.
+     * 
+     * @param {Uint8Array} rec - The 16-byte block segment containing the channel data.
+     * @returns {{rxRaw: number, txRaw: number, isTxInh: boolean, rxToneValue: number, txToneValue: number, lowpower: number, wide: number, scan: number}|null} The decoded channel data, or null if the channel is empty.
+     */
+    function gt5rDecodeChannelDataFromBlockSegment(rec) {
+      if (rec[0] === 0xff) return null;
+
+      const rxRaw = gt5rLbcd4(rec.subarray(0, 4));
+      const txRaw = gt5rLbcd4(rec.subarray(4, 8));
+      const isTxInh = rec[4] === 0xff && rec[5] === 0xff && rec[6] === 0xff && rec[7] === 0xff;
+      const rxToneValue = rec[8] | (rec[9] << 8);
+      const txToneValue = rec[10] | (rec[11] << 8);
+      const lowpower = rec[14] & 0x03;
+      const wide = (rec[15] >> 6) & 0x1;
+      const scan = (rec[15] >> 2) & 0x1;
+
+      return {
+        rxRaw,
+        txRaw,
+        isTxInh,
+        rxToneValue,
+        txToneValue,
+        lowpower,
+        wide,
+        scan,
+      };
     }
 
     /**
