@@ -2062,19 +2062,14 @@ I guess just let the error happen.*/
         readSerialButton.disabled = true;
         readSerialButton.style.setProperty('--progress', '0%');
 
-        const chunks = await gt5rDownload(byteReader, (done, total) => {
+        deviceMemory.forEach((chunk, index) => { deviceMemory[index] = undefined; });
+        await gt5rDownload(byteReader, (done, total) => {
           const progress = Math.round((done / total) * 100);
           showStatus(`Reading from GT-5R\u2026 ${progress}%`, "#memory");
           readSerialButton.style.setProperty('--progress', `${progress}%`);
         });
 
-        // create a single array of the length of the chunks combined
-        const data = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
-        let offset = 0;
-        // copy each chunk into the combined data array
-        for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
-
-        sourceMemories = gt5rParseImage(data);
+        gt5rParseImage();
         showStatus(`${sourceMemories.length} read-only channels read from GT-5R`, "#memory");
         fileName = 'gt5r-read.csv';
         render();
@@ -2489,15 +2484,17 @@ I guess just let the error happen.*/
 
     /**
      * Decode the channel data from the GT-5R radio data.
-     * Names are in later blocks.
-     * @param {Uint8Array} data - The raw data from the radio.
-     * @param {number} index - The channel index.
-     * @returns {string} The decoded channel name.
      */
-    function gt5rParseImage(data) {
+    function gt5rParseImage() {
+      // create a single array of the length of the chunks combined
+      const data = new Uint8Array(deviceMemory.reduce((sum, chunk) => sum + chunk.length, 0));
+      let offset = 0;
+      // copy each chunk into the combined data array
+      for (const chunk of deviceMemory) { data.set(chunk, offset); offset += chunk.length; }
+
       const channels = [];
       for (let index = 0; index < GT5R_CHANNEL_COUNT; index += 1) { const memory = gt5rDecodeChannel(data, index); if (memory) channels.push(memory); }
-      return channels;
+      sourceMemories = channels;
     }
 
     function setControlValue(name, value) {
