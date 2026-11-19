@@ -154,13 +154,6 @@
     body {
       margin: 0;
     }
-    .floatread-serial {
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 1000;
-      padding: 0;
-    }
 
     .masthead {
       align-items: end;
@@ -170,13 +163,15 @@
       gap: 2rem;
       justify-content: space-between;
       padding: 0.5em;
+
+      div { display: flex; }
     }
 
     .kicker {
       color: var(--leaf-bright);
       font-size: .7rem;
       letter-spacing: .17em;
-      margin: 0 0 .75rem;
+      margin: 0;
       text-transform: uppercase;
     }
 
@@ -216,6 +211,13 @@
     main {
       margin: 0 auto;
       padding: 0.5em;
+    }
+
+    .memory-visualization {
+      position: sticky;
+      top: 0;
+      z-index: 1001;
+      background-color: var(--canvas);
     }
 
     .table-section {
@@ -264,8 +266,12 @@
       margin-bottom: auto;
       cursor: pointer;
     }
+    tr td .collapse-indicator {
+      width: 1.5em;
+    }
 
-    .table-section.collapsed .collapse-indicator {
+    tr.collapsed .collapse-indicator,
+    .table-section.collapsed > div > .collapse-indicator {
       transform: rotate(90deg);
     }
 
@@ -763,8 +769,6 @@
 </datalist>
 
 <body>
-  <button id="read-serial-floating" class="floatread-serial" type="button">⤓</button>
-
   <header class="masthead">
     <div>
       <p class="kicker">A small</p>
