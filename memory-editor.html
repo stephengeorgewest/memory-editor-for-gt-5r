@@ -952,7 +952,7 @@ function allFieldsEmpty(dataFields){
               <td>SQL - Squelch level</td>
               <td>
                 <p>Setting the squelch to 0 opens it entirely.</p>
-                <select id="settings-0">
+                <select id="settings-0" name="settings-0">
                 <option value="0">0</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -994,11 +994,11 @@ function allFieldsEmpty(dataFields){
                 <table>
                   <tr><th>VFO-A</th><th>VFO-B</th></tr>
                   <tr><td>
-                    <label><input type="radio" name="vfo-a-txpower" value="0" /> LOW [0]</label>
-                    <label><input type="radio" name="vfo-a-txpower" value="1" /> HIGH [1]</label>
+                    <label><input type="radio" name="vfo-a-txpower" value="0" /> HIGH [0]</label>
+                    <label><input type="radio" name="vfo-a-txpower" value="1" /> LOW [1]</label>
                   </td><td>
-                    <label><input type="radio" name="vfo-b-txpower" value="0" /> LOW [0]</label>
-                    <label><input type="radio" name="vfo-b-txpower" value="1" /> HIGH [1]</label>
+                    <label><input type="radio" name="vfo-b-txpower" value="0" /> HIGH [0]</label>
+                    <label><input type="radio" name="vfo-b-txpower" value="1" /> LOW [1]</label>
                   </td></tr>
                 </table>
               </td>
@@ -1596,7 +1596,10 @@ function allFieldsEmpty(dataFields){
                 <input type="text" name="settings-poweron-message-c" value="" />
                 <input type="text" name="settings-poweron-message-d" value="" />
               </td>
-              <td>ÿ is 255, and is not displayed. TODO: Allowed Characters.
+              <td>Allowed Characters: ASCII 32-126
+                <pre style="white-space:pre-wrap; border: 1px dashed var(--forest-light); width: min-content; margin:0;"><script>
+                  document.write([...Array(95).keys()].map(x => String.fromCharCode(x + 32)).join('').split("`").join("<br />`"))
+                </script></pre>
               </td>
             </tr>
             <tr class="disabled">
@@ -1637,9 +1640,11 @@ function allFieldsEmpty(dataFields){
                     <th>${i+1}</th>
                     <td>PTTID ${i + 1}</td>
                     <td>
-                      <input type="text" name="settings-pttid-${i+1}" value="" />
+                      <input type="text" name="settings-pttid-${i+1}" maxlength="5" pattern="[0-9ABCD*#]{1,5}" value="" />
                     </td>
-                    <td>${ (i === 0) ? '<a href="#settings-17">Used in setting #17 S-CODE - Signal Code</a>' : ""}</td>
+                    <td>${ 
+                      (i === 0) ? '<a href="#settings-17">Used in setting #17 S-CODE - Signal Code</a>'
+                      : (i === 1) ? "charset = '0123456789ABCD*#'" : ""}</td>
                   </tr>
                 `);
               });
@@ -2374,9 +2379,9 @@ I guess just let the error happen.*/
             }
           } else if (addr === GT5R_POWERON_MESSAGE_START) {
             const messagea = String.fromCharCode(...chunk.slice(16, 16 + 7));
-            const messageb = String.fromCharCode(...chunk.slice(16 + 8, 16+8+7));
-            const poweron_msg_a = String.fromCharCode(...chunk.slice(16 + 16, 16+16+ 7));
-            const poweron_msg_b = String.fromCharCode(...chunk.slice(16 + 24, 16+24+7));
+            const messageb = String.fromCharCode(...chunk.slice(16 + 7, 16 + 7 + 7));
+            const poweron_msg_a = String.fromCharCode(...chunk.slice(16 + 16    , 16 + 16 + 7  ));
+            const poweron_msg_b = String.fromCharCode(...chunk.slice(16 + 16 + 7, 16 + 16 + 7 + 7));
             const firmware_message = String.fromCharCode(...chunk.slice(16 + 32, 16 + 32 + 8));
 
             setControlValue('settings-poweron-message-a', messagea);
