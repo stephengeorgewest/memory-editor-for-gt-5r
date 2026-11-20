@@ -1760,11 +1760,9 @@ function allFieldsEmpty(dataFields){
             </tr>
           </thead>
           <tbody id="source-body">
-            <tr>
-              <td class="empty" colspan="18">No CSV imported.</td>
-            </tr>
           </tbody>
         </table>
+        <div id="no-csv">No CSV imported.</div>
       </section>
     </section>
 
@@ -1791,7 +1789,12 @@ function allFieldsEmpty(dataFields){
 
 
     function render() {
-      document.querySelector('#source-body').innerHTML = sourceMemories.length ? sourceMemories.map((memory, index) => `<tr imported-location="${memory.Location}"><td class="channel">${memory.Location}</td>${csvHeaders.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('') : '<tr><td class="empty" colspan="18">No CSV imported.</td></tr>';
+      if(sourceMemories.length === 0) {
+        document.querySelector('#no-csv').style.display = 'block';
+      } else {
+        document.querySelector('#no-csv').style.display = 'none';
+      }
+      document.querySelector('#source-body').innerHTML = sourceMemories.map((memory, index) => `<tr imported-location="${memory.Location}"><td class="channel">${memory.Location}</td>${csvHeaders.slice(1).map((header) => `<td>${escapeHtml(memory[header])}</td>`).join('')}<td class="action"><button class="tertiary" data-action="copy" data-source-index="${index}" title="Copy channel to main">Copy</button></td></tr>`).join('');
       document.querySelector('#copy-all').disabled = sourceMemories.length === 0;
       document.querySelectorAll('[imported-location]').forEach((cell) => cell.addEventListener('click', importedLocationClick));
       document.querySelectorAll('[data-field]').forEach((control) => control.addEventListener('change', updateMemory));
@@ -1862,9 +1865,8 @@ I guess just let the error happen.*/
       });
 
       const readSerialButton = document.querySelector('#read-serial');
-      const readSerialFloatingButton = document.querySelector('#read-serial-floating');
-      if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; readSerialFloatingButton.disabled = true; readSerialFloatingButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
-      else { readSerialButton.addEventListener('click', readFromGt5r); readSerialFloatingButton.addEventListener('click', readFromGt5r); }
+      if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
+      else { readSerialButton.addEventListener('click', readFromGt5r); }
       document.querySelector('#select-serial-log').addEventListener('change', (event) => {
         const index = Number(event.target.value);
         showSerialLog(index);
@@ -2114,10 +2116,8 @@ I guess just let the error happen.*/
           readSerialButton.style.setProperty('--progress', `${progress}%`);
         });
 
-        gt5rParseImage();
         showStatus('GT-5R read successfully.', "#memory");
 
-        render();
       } catch (error) {
         document.querySelector('#radio-settings-status').textContent = `Settings read failed: ${error.message || 'serial error'}`;
         showStatus(error.message || 'Failed to read from radio', "#memory");
