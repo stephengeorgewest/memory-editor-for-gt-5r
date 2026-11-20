@@ -40,6 +40,7 @@
     const CHANNEL_MEMORY_START = 0x0000;
     const CHANNEL_MEMORY_DATA_END = 0x0800; //only 128 channels
     const GT5R_DTMF_CHARSET = '0123456789ABCD*#';
+    const GT5R_ANI_CHARSET = '0123456789:;<=>?'; // ANI in the manual says numeric, but other values display. seems to accept these characters. byte values for ascii column 3?
     const PTTID_START = 0x0B00;// PTTID is 16bits at 0xb00 (0x0b08-0x8), repeated 15 times up to half of 0x0BC0
     const ANI_START = 0x0C80;// ani is 5 bytes? at 0x0cb2 within this struct(0x0C88-0x8), currently set to "80808" on the device
     const SETTINGS_START = 0x0E00; /// start of the settings memory block settings are split between 2 chunks
@@ -654,6 +655,21 @@
       display: none;
     }
 
+    note {
+      display: block;
+      font-size: .75rem;
+      border-color: var(--focus);
+      border-style: solid;
+      border-left-width: 1px;
+      border-top-width: 1px;
+      margin-left: 0.5rem;
+      padding: 0.5rem;
+    }
+    note::before{
+      content: "Note: ";
+      font-weight: bold;
+    }
+
     .serial-log {
       background: var(--paper);
       border: 1px solid var(--line);
@@ -786,7 +802,7 @@
       <button id="write-serial" class="primary" type="button" disabled>Write to GT-5R</button>
       <button id="read-serial" class="secondary read-serial" type="button">Read from GT-5R</button>
     </section>
-    <form id="gt5rSettingsForm">
+    <form id="gt5rSettingsForm" onkeydown="return event.key != 'Enter';">
     <section class="table-section">
       <div class="table-heading">
         <div>
@@ -1175,8 +1191,12 @@ function allFieldsEmpty(dataFields){
             <tr id="settings-15">
               <td>15</td>
               <td>ANI-ID - Automatic Number ID</td>
-              <td><input id="settings-15" name="settings-15" type="text" inputmode="numeric" value="" aria-label="ANI code programmed by computer software"></td>
-              <td><del>Displays</del> the ANI code which has been set by computer software. <del>This menu cannot be used to change it</del>. The ANI-ID is sent when the alarm is activated and <a href="#settings-32">menu 32</a>=CODE.</td>
+              <td><input id="settings-15" name="settings-15" type="text" maxlength="5" inputmode="numeric" value="" aria-label="ANI code programmed by computer software"></td>
+              <td><del>Displays</del> the ANI code which has been set by computer software.
+                <del>This menu cannot be used to change it</del>. 
+                The ANI-ID is sent when the alarm is activated and <a href="#settings-32">menu 32</a>=CODE.
+                <note>Manual says numeric, but other values display <script>document.write(GT5R_ANI_CHARSET)</script> , or 0x00-0xFF in ascii column 3. Setting non numeric breaks CHIRP when reading the settings</note>
+              </td>
             </tr>
             <tr id="settings-16">
               <td>16</td>
@@ -2173,7 +2193,7 @@ I guess just let the error happen.*/
       }
 
       /**
-       * TODO: fixes needed (workaround applied)
+       * TODO: fixes needed
        * Writing to the GT-5R in 16-byte blocks doesn't work sometimes.
        * writing name fields and channel data ✅works.
        * writing setting 0 SQL setting doesn't stick.
@@ -2227,7 +2247,6 @@ I guess just let the error happen.*/
        * 
        * writing blocks 0x0E20, 0x0E30, 0x0E40 the settings seem to stick, but the green LED is stuck on.
        * 
-       * WORKAROUND IS TO WRITE ALL THE "SETTINGS" type blocks if any of them changes. Seems to work.
        */
       let port;
       try { port = await navigator.serial.requestPort(); }
@@ -2496,7 +2515,7 @@ I guess just let the error happen.*/
               const pttidIndexInChunk = i*CHUNK_SIZE/4;
               const pttidSubarray = chunk.slice(pttidIndexInChunk, pttidIndexInChunk+5);
               const settingName = "settings-pttid-" + (i+1 + chunkIndex*4);
-              const settingValue = gt5rDecodeDtmf(pttidSubarray, GT5R_DTMF_CHARSET);
+              const settingValue = gt5rDecodeDtmf(pttidSubarray);
               //console.log(settingName, settingValue);
               setControlValue(settingName, settingValue);
             }
@@ -2504,15 +2523,15 @@ I guess just let the error happen.*/
             //console.log(chunk);
             //TODO: ALARM CODES. Chirp only exposes the third value? 
             for(let i=0; i < 3; i++) {
-              const code = chunk.slice(i*5, i*5+3).join("");
-              //console.log(code);
-              if(i===2) setControlValue('settings-alarm-code', code);
+              // CHIRP displays 3digit ALARM code as DTMF characters
+              const code = Array.from(chunk.slice(i*5, i*5+3), (byte) => GT5R_DTMF_CHARSET[byte]);
+              if(i===2) setControlValue('settings-alarm-code', code.join(''));
             }
             const aniCodeStart = 0x0CAA;
             const aniCodeEnd = aniCodeStart + 5;
             const aniCodeBytes = chunk.subarray(aniCodeStart - addr, aniCodeEnd - addr);
             const aniCode = Array.from(aniCodeBytes)
-              .map((byte) => (byte === 0xff ? '' : String(byte)))
+              .map((byte) => GT5R_ANI_CHARSET[byte])
               .join('');
             setControlValue('settings-15', aniCode);
 
@@ -2841,6 +2860,18 @@ I guess just let the error happen.*/
       return bytes;
     }
 
+    function gt5rEncodeANI(value, length, label) {
+      const text = String(value).trim().toUpperCase();
+      if (text.length > length) throw new Error(`${label} must be at most ${length} ANI characters.`);
+      const bytes = new Uint8Array(length).fill(0xff);
+      for (let index = 0; index < text.length; index += 1) {
+        const code = GT5R_ANI_CHARSET.indexOf(text[index]);
+        if (code < 0) throw new Error(`${label} contains an unsupported ANI character.`);
+        bytes[index] = code;
+      }
+      return bytes;
+    }
+
     function gt5rApplyUploadEdits(chunks) {
       if (chunks.length !== MAX_MEMORY_ADDRESS / CHUNK_SIZE ||
           chunks.some((chunk) => !(chunk instanceof Uint8Array) || chunk.length !== CHUNK_SIZE)) {
@@ -2996,14 +3027,14 @@ I guess just let the error happen.*/
         gt5rWriteChunkRange(image, PTTID_START + (index - 1) * 16,
           gt5rEncodeDtmf(gt5rControlValue(name), 5, `PTT-ID ${index}`));
       }
-      for (const [name, address, length, label] of [
-        ['settings-alarm-code', ANI_START + 10, 3, 'Alarm code'],
-        ['settings-15', ANI_START + 42, 5, 'ANI code'],
-      ]) {
-        if (gt5rNameChanged(name)) {
-          gt5rWriteChunkRange(image, address, gt5rEncodeDtmf(gt5rControlValue(name), length, label));
-        }
+
+      if (gt5rNameChanged('settings-alarm-code')) {
+        gt5rWriteChunkRange(image, ANI_START + 10, gt5rEncodeDtmf(gt5rControlValue('settings-alarm-code'), 3, 'Alarm code'));
       }
+      if (gt5rNameChanged('settings-15')) {
+        gt5rWriteChunkRange(image, ANI_START + 42, gt5rEncodeANI(gt5rControlValue('settings-15'), 5, 'ANI code'));
+      }
+      
       if (gt5rNameChanged('settings-ani-id')) {
         const address = ANI_START + 47;
         gt5rSetChunkByte(image, address, (gt5rChunkByte(image, address) & 0xfc) |
