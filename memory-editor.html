@@ -579,14 +579,14 @@
       min-width: 5.8rem;
     }
 
-    #read-serial {
+    #read-serial, #write-serial {
       --progress: 0%;
       background-image: linear-gradient(to right, var(--leaf-bright) var(--progress), transparent var(--progress));
       background-repeat: no-repeat;
       position: relative;
     }
 
-    #read-serial[disabled] {
+    #read-serial[disabled].active, #write-serial[disabled].active {
       cursor: progress;
       color: var(--button-border);
     }
@@ -952,12 +952,12 @@ function allFieldsEmpty(dataFields){
             <tr><td colspan="4"><div class="collapse-indicator" data-collapse-target="radio-settings-body">></div></td></tr>
           </thead>
           <tbody id="radio-settings-body">
-            <tr id="settings-0">
+            <tr id="settings-0" data-memory-address-write-block="0x0E020:0x10">
               <td>0</td>
               <td>SQL - Squelch level</td>
               <td>
                 <p>Setting the squelch to 0 opens it entirely.</p>
-                <select id="settings-0" name="settings-0">
+                <select id="settings-0" name="settings-0" data-memory-address="0x0E020">
                 <option value="0">0</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -975,16 +975,16 @@ function allFieldsEmpty(dataFields){
                 <p>Sensitivity can be varied from .1 to .2 mv on VHF</p>
               </td>
             </tr>
-            <tr id="settings-1">
+            <tr id="settings-1" data-memory-address-write-block="0x0F00:0x40">
               <td>1</td>
               <td>Tuning step</td>
               <td>
                   <table>
                     <tr><th>VFO-A</th><th>VFO-B</th></tr>
                     <tr><td>
-                      <input type="text" list="StepValue-datalist" name="vfo-a-step" />
+                      <input type="text" list="StepValue-datalist" name="vfo-a-step" data-memory-address="0x0F08" />
                     </td><td>
-                      <input type="text" list="StepValue-datalist" name="vfo-b-step" />
+                      <input type="text" list="StepValue-datalist" name="vfo-b-step" data-memory-address="0x0F28" />
                     </td></tr>
                   </table>
               </td>
@@ -992,28 +992,28 @@ function allFieldsEmpty(dataFields){
                 <p>Selects the amount of frequency change in VFO/Frequency mode when scanning or pressing the ▲ and ▼ keys.</p>
               </td>
             </tr>
-            <tr id="settings-2">
+            <tr id="settings-2" data-memory-address-write-block="0x0F00:0x40">
               <td>2</td>
               <td>TXP - Transmit Power</td>
               <td>
                 <table>
                   <tr><th>VFO-A</th><th>VFO-B</th></tr>
                   <tr><td>
-                    <label><input type="radio" name="vfo-a-txpower" value="0" /> HIGH [0]</label>
-                    <label><input type="radio" name="vfo-a-txpower" value="1" /> LOW [1]</label>
+                    <label><input type="radio" name="vfo-a-txpower" value="0" data-memory-address="0x0F1F:7" /> HIGH [0]</label>
+                    <label><input type="radio" name="vfo-a-txpower" value="1" data-memory-address="0x0F1F:7" /> LOW [1]</label>
                   </td><td>
-                    <label><input type="radio" name="vfo-b-txpower" value="0" /> HIGH [0]</label>
-                    <label><input type="radio" name="vfo-b-txpower" value="1" /> LOW [1]</label>
+                    <label><input type="radio" name="vfo-b-txpower" value="0" data-memory-address="0x0F3F:7" /> HIGH [0]</label>
+                    <label><input type="radio" name="vfo-b-txpower" value="1" data-memory-address="0x0F3F:7" /> LOW [1]</label>
                   </td></tr>
                 </table>
               </td>
               <td><p>Selects between HIGH and LOW transmitter power when in Variable Frequency Oscillator (VFO) mode.
                 Use the minimum transmitter power necessary to carry out the desired communications.</p></td>
             </tr>
-            <tr id="settings-3">
+            <tr id="settings-3" data-memory-address-write-block="0x0E23:0x20">
               <td>3</td>
               <td>SAVE - Battery save</td>
-              <td><select name="settings-3">
+              <td><select name="settings-3" data-memory-address="0x0F23">
                 <option value="0">Off [0]</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -1025,10 +1025,10 @@ function allFieldsEmpty(dataFields){
                 The higher number increases the RX sleep cycle, 
                 but you may miss the first few syllables before the RX opens.</p></td>
             </tr>
-            <tr id="settings-4">
+            <tr id="settings-4" data-memory-address-write-block="0x0F20:0x10">
               <td>4</td>
               <td>VOX - Voice Operated Transmit</td>
-              <td><select name="settings-4">
+              <td><select name="settings-4" data-memory-address="0x0F24">
                 <option value="0">Off [0]</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -1041,7 +1041,7 @@ function allFieldsEmpty(dataFields){
               <td><p>When enabled it is not necessary to push the [PTT] button to transmit. 
                 Adjust the gain level to an appropriate sensitivity to allow smooth transmission.</p></td>
             </tr>
-            <tr id="settings-5">
+            <tr id="settings-5" data-memory-address-write-block="0x0F00:0x40">
               <td>5</td>
               <td>WN - Wide band / Narrow band</td>
               <td>
@@ -1049,11 +1049,11 @@ function allFieldsEmpty(dataFields){
                   <tr><th>VFO-A</th><th>VFO-B</th></tr>
                   <tr><td>
                     <style>tr table label{white-space: nowrap;}</style>
-                <label><input type="radio" name="vfo-a-widenarr" value="0">WIDE [0]</input></label>
-                <label><input type="radio" name="vfo-a-widenarr" value="1">NARR [1]</input></label>
+                <label><input type="radio" name="vfo-a-widenarr" value="0" data-memory-address="0x0F1F:6">WIDE [0]</input></label>
+                <label><input type="radio" name="vfo-a-widenarr" value="1" data-memory-address="0x0F1F:6">NARR [1]</input></label>
               </td><td>
-                <label><input type="radio" name="vfo-b-widenarr" value="0">WIDE [0]</input></label>
-                <label><input type="radio" name="vfo-b-widenarr" value="1">NARR [1]</input></label>
+                <label><input type="radio" name="vfo-b-widenarr" value="0" data-memory-address="0x0F3F:6">WIDE [0]</input></label>
+                <label><input type="radio" name="vfo-b-widenarr" value="1" data-memory-address="0x0F3F:6">NARR [1]</input></label>
               </td></tr>
                 </table>
               </td>
@@ -1062,7 +1062,7 @@ function allFieldsEmpty(dataFields){
             <tr id="settings-6">
               <td>6</td>
               <td>ABR - Display Illumination Time</td>
-                <td><select name="settings-6">
+                <td><select name="settings-6" data-memory-address="0x0F26">
                   <option value="0">OFF [0]</option>
                   <option value="1">1</option><option value="2">2</option>
                   <option value="3">3</option><option value="4">4</option>
@@ -1076,8 +1076,8 @@ function allFieldsEmpty(dataFields){
               <td>7</td>
               <td>TDR - Dual Watch, Dual Reception</td>
                 <td>
-                  <label><input type="radio" name="settings-7" value="0">OFF [0]</input></label>
-                  <label><input type="radio" name="settings-7" value="1">ON [1]</input></label>
+                  <label><input type="radio" name="settings-7" value="0" data-memory-address="0x0F27:0">OFF [0]</input></label>
+                  <label><input type="radio" name="settings-7" value="1" data-memory-address="0x0F27:0">ON [1]</input></label>
                 </td>
               <td>Monitor [A] and [B] at the same time. 
                 The display with the most recent activity will be switch to automatically.</td>
@@ -1086,8 +1086,8 @@ function allFieldsEmpty(dataFields){
               <td>8</td>
               <td>BEEP - Keypad Beep</td>
                 <td>
-                  <label><input type="radio" name="settings-8" value="0">OFF [0]</input></label>
-                  <label><input type="radio" name="settings-8" value="1">ON [1]</input></label>
+                  <label><input type="radio" name="settings-8" value="0" data-memory-address="0x0F28:0">OFF [0]</input></label>
+                  <label><input type="radio" name="settings-8" value="1" data-memory-address="0x0F28:0">ON [1]</input></label>
                 </td>
               <td>Allows audible confirmation of a key press.</td>
             </tr>
@@ -1096,7 +1096,7 @@ function allFieldsEmpty(dataFields){
               <td>TOT - Transmission Time-out Timer</td>
               <td>
                 15[0]-600[39] in 15 second steps (TIMEOUT-15)/15=[n]
-                <input id="settings-9" name="settings-9" type="number" list="tot-timeouts" aria-label="TOT timeout index"></td>
+                <input id="settings-9" name="settings-9" type="number" list="tot-timeouts" aria-label="TOT timeout index" data-memory-address="0x0F29"></td>
               <td>
                 This feature provides a safety switch that limits transmission time to a programmed value. 
                 This will promote battery conservation by not allowing you to make excessively long transmissions, 
@@ -1166,9 +1166,9 @@ function allFieldsEmpty(dataFields){
               <td>14</td>
               <td>VOICE - Voice Prompt</td>
                 <td>
-                  <label><input type="radio" id="settings-14" name="settings-14" value="0">OFF [0]</input></label>
-                  <label><input type="radio" id="settings-14" name="settings-14" value="1">ENG [1]</input></label>
-                  <label><input type="radio" id="settings-14" name="settings-14" value="2">CHI [2]</input></label>
+                  <label><input type="radio" id="settings-14" name="settings-14" value="0" data-memory-address="0x0F2E">OFF [0]</input></label>
+                  <label><input type="radio" id="settings-14" name="settings-14" value="1" data-memory-address="0x0F2E">ENG [1]</input></label>
+                  <label><input type="radio" id="settings-14" name="settings-14" value="2" data-memory-address="0x0F2E">CHI [2]</input></label>
                 </td>
               <td>Sets the radio's voice prompts to the language set when pressing a button.</td>
             </tr>
@@ -1182,10 +1182,10 @@ function allFieldsEmpty(dataFields){
               <td>16</td>
               <td>DTMFST - DTMF Side Tone of Transmit Code</td>
               <td><label id="settings-16">
-                <input name="settings-16" type="radio" value="0">OFF [0]: no DTMF Side Tones are heard.</input></label>
-                <label><input name="settings-16" type="radio" value="1">DT-ST [1]:  Side Tones are heard only from automatically keyed DTMF tones</input></label>
-                <label><input name="settings-16" type="radio" value="2">ANI-ST [2]:  Sounds automatic ANI/PTT-ID tones(Manual does not indicate this setting, but it is exists on the handset between DT-ST and DT+ANI).</input></label>
-                <label><input name="settings-16" type="radio" value="3">DT+ANI [3]: All DTMF Side Tones are heard</input></label>
+                <input name="settings-16" type="radio" value="0" data-memory-address="0x0F2F:0">OFF [0]: no DTMF Side Tones are heard.</input></label>
+                <label><input name="settings-16" type="radio" value="1" data-memory-address="0x0F2F">DT-ST [1]:  Side Tones are heard only from automatically keyed DTMF tones</input></label>
+                <label><input name="settings-16" type="radio" value="2" data-memory-address="0x0F2F">ANI-ST [2]:  Sounds automatic ANI/PTT-ID tones(Manual does not indicate this setting, but it is exists on the handset between DT-ST and DT+ANI).</input></label>
+                <label><input name="settings-16" type="radio" value="3" data-memory-address="0x0F2F">DT+ANI [3]: All DTMF Side Tones are heard</input></label>
               </td>
               <td>
                 <p>Determines when DTMF Side Tones can be heard from the transceiver speaker.</p>
@@ -1866,8 +1866,17 @@ I guess just let the error happen.*/
       });
 
       const readSerialButton = document.querySelector('#read-serial');
-      if (!('serial' in navigator)) { readSerialButton.disabled = true; readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).'; }
-      else { readSerialButton.addEventListener('click', readFromGt5r); }
+      const writeSerialButton = document.querySelector('#write-serial');
+      if (!('serial' in navigator)) {
+        readSerialButton.disabled = true;
+        readSerialButton.title = 'Web Serial API is not available in this browser (try Chrome or Edge).';
+        writeSerialButton.disabled = true;
+        writeSerialButton.title = readSerialButton.title;
+      } else {
+        readSerialButton.addEventListener('click', readFromGt5r);
+        writeSerialButton.addEventListener('click', writeToGt5r);
+        writeSerialButton.disabled = !radioImageReady;
+      }
       document.querySelector('#select-serial-log').addEventListener('change', (event) => {
         const index = Number(event.target.value);
         showSerialLog(index);
@@ -2103,11 +2112,15 @@ I guess just let the error happen.*/
       try { port = await navigator.serial.requestPort(); }
       catch (error) { return; } // user cancelled the port picker
       const readSerialButton = document.querySelector('#read-serial');
+      const writeSerialButton = document.querySelector('#write-serial');
       try {
         const byteReader = new SerialByteReaderWriterWithLogger(port);
         await byteReader.open();
+        radioImageReady = false;
+        writeSerialButton.disabled = true;
         showStatus('Reading from GT-5R\u2026', "#memory");
         readSerialButton.disabled = true;
+        readSerialButton.classList.add('active');
         readSerialButton.style.setProperty('--progress', '0%');
 
         deviceMemory.forEach((chunk, index) => { deviceMemory[index] = undefined; });
@@ -2117,9 +2130,13 @@ I guess just let the error happen.*/
           readSerialButton.style.setProperty('--progress', `${progress}%`);
         });
 
+        radioImageReady = true;
         showStatus('GT-5R read successfully.', "#memory");
 
       } catch (error) {
+        radioImageReady = false;
+        writeSerialButton.disabled = true;
+        readSerialButton.classList.remove('active');
         document.querySelector('#radio-settings-status').textContent = `Settings read failed: ${error.message || 'serial error'}`;
         showStatus(error.message || 'Failed to read from radio', "#memory");
         console.log(error)
@@ -2127,6 +2144,147 @@ I guess just let the error happen.*/
         try { await port.close(); } catch (error) { /* already closed */ }
         readSerialButton.disabled = false;
         readSerialButton.style.setProperty('--progress', '0%');
+        readSerialButton.classList.remove('active');
+        writeSerialButton.disabled = !radioImageReady;
+      }
+    }
+
+    async function writeToGt5r() {
+      if (!radioImageReady) {
+        showStatus('Read the radio before writing changes.', '#memory');
+        return;
+      }
+
+      let upload;
+      let blocks;
+      try {
+        upload = gt5rApplyUploadEdits(deviceMemory);
+        blocks = gt5rGetWritableBlocks(upload.original, upload.chunks);
+      } catch (error) {
+        showStatus(error.message || 'Could not prepare radio image for writing.', '#memory');
+        return;
+      }
+      if (!blocks.length) {
+        showStatus('No supported changes to write.', '#memory');
+        return;
+      }
+      if (!window.confirm(`Write ${blocks.length} 16-byte blocks to the connected GT-5R? Make sure it is the same radio you just read. \n${blocks.map(b => `Block 0x${b.toString(16)}`).join('\n')}`)) {
+        return;
+      }
+
+      /**
+       * TODO: fixes needed (workaround applied)
+       * Writing to the GT-5R in 16-byte blocks doesn't work sometimes.
+       * writing name fields and channel data ✅works.
+       * writing setting 0 SQL setting doesn't stick.
+       * writing setting 1 doesn't stick.
+       * writing setting 2 txp a/b ✅works
+       * writing setting 3 doesn't stick.
+       * writing setting 4 doesn't stick.
+       * writing setting 5 doesn't work individuall, but if both are set together it works.
+       * writing setting 6 doesn't stick.
+       * writing setting 7 doesn't stick.
+       * writing setting 8 doesn't stick.
+       * writing setting 9 doesn't stick.
+       * writing setting 10/11 vfo-a,vfo-b R-CTCSS doesn't stick.
+       * writing setting 12/13 vfo-a,vfo-b T-CTCSS ✅works.
+       * writing setting 14 doesn't stick.
+       * writing setting 15 doesn't stick.
+       * writing setting 16 doesn't stick.
+       * writing setting 17 vfo-a,vfo-b S-code setting writes ✅fine.
+       * writing setting 18 doesn't stick.
+       * writing setting 19 doesn't stick either.
+       * writing setting 20 doesn't stick.
+       * writing setting 21 doesn't stick.
+       * writing setting 22 doesn't stick.
+       * writing setting 23 doesn't stick.
+       * writing setting 24 doesn't stick.
+       * writing setting 25 works fine, at least when changing both at the same time.
+       * writing setting 26 works ✅fine. at least while changing both at the same time.
+       * 27/28 are delete items in the device menu.
+       * 29,30,31 don't stick but are some of the ones changed by setting 42☠️
+       * 
+       * writing setting 29 doesn't stick.
+       * writing setting 30 doesn't stick.
+       * writing setting 31 doesn't stick.
+       * writing setting 32 doesn't stick.
+       * writing setting 33 doesn't stick. 
+       * writing setting 34 sticks but effects are similar to setting 42.
+       * writing setting 35 sticks but effects are similar to setting 42.
+       * writing setting 36 effects are similar to setting 42.
+       * writing setting 42 "display a/b" disables backlight, disables menubutton, changes setting 21-22 to CH [0] and some other unexpected behavior.
+       * more specifically:
+       * 0x0E20–0x0E3F: all 32 settings bytes changed to 00. This includes squelch 7→0, backlight duration 5→0, voice prompts 1→0, and both channel-display settings changing to Channel.
+       * 0x0E4A: 1F→1C, disabling both the Reset menu and All Menus flags.
+       * 
+       * DTMF settings don't stick when written in 16-byte blocks.
+       * 
+       * Further notes: writing additional blocks past just a single 16-byte block:
+       * writing blocks 0x0E20-0x0x40 in addition to changes in 0x0F10(setting33 band-a) and 0x0F30(setting33 band-b),
+       * the vfo-a frequency and vfo-b frequency appear to have been changed (address 0x0F08-9,  0x0F0A, 0x0F28, 0x0F0A) are also affected.
+       * perhaps the vfoblock needs to be written as a as a whole 64-byte block(, or in entirety but in 16-byte chunks)1),
+       * in addition to writing the settings blocks before it.
+       * 
+       * writing blocks 0x0E20, 0x0E30, 0x0E40 the settings seem to stick, but the green LED is stuck on.
+       * 
+       * WORKAROUND IS TO WRITE ALL THE "SETTINGS" type blocks if any of them changes. Seems to work.
+       */
+      let port;
+      try { port = await navigator.serial.requestPort(); }
+      catch (error) { return; }
+
+      const readSerialButton = document.querySelector('#read-serial');
+      const writeSerialButton = document.querySelector('#write-serial');
+      readSerialButton.disabled = true;
+      writeSerialButton.disabled = true;
+      writeSerialButton.style.setProperty('--progress', '0%');
+      writeSerialButton.classList.add('active');
+
+      let byteReader;
+      try {
+        byteReader = new SerialByteReaderWriterWithLogger(port);
+        await byteReader.open();
+        const ident = await gt5rIdent(byteReader);
+        if (ident.some((byte, index) => byte !== IDENT[index])) {
+          throw new Error('Connected radio is not the expected GT-5R.');
+        }
+
+        for (let index = 0; index < blocks.length; index += 1) {
+          const address = blocks[index];
+          const chunk = upload.chunks[Math.floor(address / CHUNK_SIZE)];
+          const offset = address % CHUNK_SIZE;
+          const data = chunk.slice(offset, offset + 0x10);
+          await gt5rWriteBlock(byteReader, address, data);
+          const progress = Math.round(((index + 1) / blocks.length) * 100);
+            writeSerialButton.style.setProperty('--progress', `${progress}%`);
+          showStatus(`Writing GT-5R ${progress}%`, '#memory');
+          writeSerialButton.style.setProperty('--progress', `${progress}%`);
+        }
+
+        for (let index = 0; index < deviceMemory.length; index += 1) {
+          const start = index * CHUNK_SIZE;
+          deviceMemory[index] = upload.chunks[index];
+        }
+        gt5rCaptureControlBaselines();
+        drawDeviceMemory();
+        showStatus(`Wrote ${blocks.length} blocks to GT-5R. Read the radio again to verify.`, '#memory');
+      } catch (error) {
+        showStatus(error.message || 'Failed to write to GT-5R.', '#memory', console.log(error));
+        writeSerialButton.classList.remove('active');
+        readSerialButton.style.setProperty('--progress', '0%');
+      } finally {
+        if (byteReader?.reader) {
+          try { await byteReader.reader.cancel(); } catch (error) { /* already closed */ }
+          try { byteReader.reader.releaseLock(); } catch (error) { /* already released */ }
+        }
+        if (byteReader?.writer) {
+          try { byteReader.writer.releaseLock(); } catch (error) { /* already released */ }
+        }
+        try { await port.close(); } catch (error) { /* already closed */ }
+        readSerialButton.disabled = false;
+        writeSerialButton.classList.remove('active');
+        readSerialButton.style.setProperty('--progress', '0%');
+        writeSerialButton.disabled = !radioImageReady;
       }
     }
 
@@ -2160,12 +2318,7 @@ I guess just let the error happen.*/
 
       async writeBytes(bytes) {
         this.addSerialLogEntry(`Wrote bytes[${bytes.map(byte => `0x${byte.toString(16).padStart(2, '0')}`).join(', ')}] at ${new Date().toISOString()}`);
-        for (const byte of bytes) {
-          await this.writer.write(new Uint8Array([byte]));
-          // chirp had a sleep for the REQUEST_CLONING_MODE_COMMAND
-          // but I think it is not needed.
-          // await sleep(10);
-        }
+        await this.writer.write(Uint8Array.from(bytes));
       }
 
       addSerialLog(firstEntry) {
@@ -2198,6 +2351,27 @@ I guess just let the error happen.*/
      * Each index corresponds to a memory address, and the value is the 64-byte data chunk read from that address.
      */
     const deviceMemory = new Array(MAX_MEMORY_ADDRESS/CHUNK_SIZE);
+    let radioImageReady = false;
+
+    function gt5rCaptureControlBaselines() {
+      const controls = document.querySelectorAll('#gt5rSettingsForm input, #gt5rSettingsForm select');
+      const radioValues = new Map();
+      controls.forEach((control) => {
+        if (control.type === 'radio' && control.checked) {
+          radioValues.set(control.name, control.value);
+        }
+      });
+      controls.forEach((control) => {
+        if (control.type === 'radio') {
+          control.dataset.radio_set_value = radioValues.get(control.name) ?? '';
+        } else if (control.type === 'checkbox') {
+          control.dataset.radio_set_value = control.checked ? '1' : '0';
+        } else {
+          control.dataset.radio_set_value = control.value;
+        }
+      });
+      highlightChanges();
+    }
 
     /**
      * Draws the current state of the device memory onto the canvas.
@@ -2503,7 +2677,7 @@ I guess just let the error happen.*/
 
 
     /**
-     * Read a 64-byte block of data from the GT-5R radio. TODO: check for dropped byte?
+    * Read a block of data from the GT-5R radio. TODO: check for dropped byte?
      * @param {SerialByteReaderWriterWithLogger} byteReader - The byte reader for communication.
      * @param {number} start - The starting address of the block.
      * Ranges from 0 to 0x1800(6144) for Channel Memory.
@@ -2533,6 +2707,416 @@ I guess just let the error happen.*/
         .filter((code) => code < GT5R_DTMF_CHARSET.length)
         .map((code) => GT5R_DTMF_CHARSET[code])
         .join('');
+    }
+
+    function gt5rControlChanged(control) {
+      const baseline = control.dataset.radio_set_value;
+      if (baseline === undefined) {
+        return control.type === 'checkbox' ? control.checked :
+          control.type === 'radio' ? control.checked : control.value !== '';
+      }
+      if (control.type === 'checkbox') {
+        return control.checked !== (baseline === '1' || baseline === 'true');
+      }
+      if (control.type === 'radio') {
+        return control.checked !== (baseline === control.value);
+      }
+      return control.value !== baseline;
+    }
+
+    function gt5rControls(name) {
+      return [...document.querySelectorAll(`#gt5rSettingsForm [name="${name}"]`)];
+    }
+
+    function gt5rControlValue(name) {
+      const controls = gt5rControls(name);
+      if (!controls.length) return '';
+      if (controls[0].type === 'radio') {
+        return controls.find((control) => control.checked)?.value ?? '';
+      }
+      if (controls[0].type === 'checkbox') return controls[0].checked ? '1' : '0';
+      return controls[0].value;
+    }
+
+    function gt5rNameChanged(name) {
+      return gt5rControls(name).some(gt5rControlChanged);
+    }
+
+    function gt5rInteger(value, minimum, maximum, label) {
+      if (!/^\d+$/.test(String(value))) throw new Error(`${label} must be an integer.`);
+      const number = Number(value);
+      if (!Number.isSafeInteger(number) || number < minimum || number > maximum) {
+        throw new Error(`${label} must be between ${minimum} and ${maximum}.`);
+      }
+      return number;
+    }
+
+    function gt5rEncodeLbcd4(value, label) {
+      let remaining = gt5rInteger(value, 0, 99999999, label);
+      const bytes = new Uint8Array(4);
+      for (let index = 0; index < bytes.length; index += 1) {
+        const pair = remaining % 100;
+        remaining = Math.floor(remaining / 100);
+        bytes[index] = (Math.floor(pair / 10) << 4) | (pair % 10);
+      }
+      return bytes;
+    }
+
+    function gt5rEncodeBcd2(value, label) {
+      const number = gt5rInteger(value, 0, 9999, label);
+      const high = Math.floor(number / 100);
+      const low = number % 100;
+      return [(Math.floor(high / 10) << 4) | (high % 10),
+        (Math.floor(low / 10) << 4) | (low % 10)];
+    }
+
+    function gt5rEncodeDigits(value, length, label) {
+      const digits = String(value).trim();
+      if (!/^\d+$/.test(digits) || digits.length > length) {
+        throw new Error(`${label} must contain up to ${length} digits.`);
+      }
+      return Uint8Array.from(digits.padStart(length, '0'), Number);
+    }
+
+    function gt5rEncodeText(value, length, label) {
+      const text = String(value);
+      if (text.length > length || [...text].some((char) => {
+        const code = char.charCodeAt(0);
+        return code < 0x20 || code > 0x7e;
+      })) {
+        throw new Error(`${label} must be at most ${length} printable ASCII characters.`);
+      }
+      const bytes = new Uint8Array(length).fill(0x20);
+      bytes.set(Array.from(text, (char) => char.charCodeAt(0)));
+      return bytes;
+    }
+
+    function gt5rChunkByte(chunks, address) {
+      const chunkIndex = Math.floor(address / CHUNK_SIZE);
+      const chunk = chunks[chunkIndex];
+      if (address < 0 || !chunk || address >= chunks.length * CHUNK_SIZE) {
+        throw new Error(`Memory address 0x${address.toString(16)} is out of range.`);
+      }
+      return chunk[address % CHUNK_SIZE];
+    }
+
+    function gt5rSetChunkByte(chunks, address, value) {
+      const chunkIndex = Math.floor(address / CHUNK_SIZE);
+      const chunk = chunks[chunkIndex];
+      if (address < 0 || !chunk || address >= chunks.length * CHUNK_SIZE) {
+        throw new Error(`Memory address 0x${address.toString(16)} is out of range.`);
+      }
+      chunk[address % CHUNK_SIZE] = value;
+    }
+
+    function gt5rReadChunkRange(chunks, start, end) {
+      const result = new Uint8Array(end - start);
+      for (let address = start; address < end; address += 1) {
+        result[address - start] = gt5rChunkByte(chunks, address);
+      }
+      return result;
+    }
+
+    function gt5rWriteChunkRange(chunks, start, bytes) {
+      for (let index = 0; index < bytes.length; index += 1) {
+        gt5rSetChunkByte(chunks, start + index, bytes[index]);
+      }
+    }
+
+    function gt5rFillChunkRange(chunks, start, end, value) {
+      for (let address = start; address < end; address += 1) {
+        gt5rSetChunkByte(chunks, address, value);
+      }
+    }
+
+    function gt5rEncodeDtmf(value, length, label) {
+      const text = String(value).trim().toUpperCase();
+      if (text.length > length) throw new Error(`${label} must be at most ${length} DTMF characters.`);
+      const bytes = new Uint8Array(length).fill(0xff);
+      for (let index = 0; index < text.length; index += 1) {
+        const code = GT5R_DTMF_CHARSET.indexOf(text[index]);
+        if (code < 0) throw new Error(`${label} contains an unsupported DTMF character.`);
+        bytes[index] = code;
+      }
+      return bytes;
+    }
+
+    function gt5rApplyUploadEdits(chunks) {
+      if (chunks.length !== MAX_MEMORY_ADDRESS / CHUNK_SIZE ||
+          chunks.some((chunk) => !(chunk instanceof Uint8Array) || chunk.length !== CHUNK_SIZE)) {
+        throw new Error('Read the complete radio before writing.');
+      }
+      const original = chunks.map((chunk) => new Uint8Array(chunk));
+      const image = original.map((chunk) => new Uint8Array(chunk));
+
+
+      for (let channel = 0; channel < GT5R_CHANNEL_COUNT; channel += 1) {
+        const names = memoryHeaders.map((field) => `channel-${channel}-${field}`);
+        if (!names.some(gt5rNameChanged)) continue;
+
+        const base = channel * CHANNEL_SIZE;
+        const frequency = gt5rControlValue(`channel-${channel}-rxFrequency`).trim();
+        const name = gt5rControlValue(`channel-${channel}-name`);
+        if (!frequency) {
+          if (!name.trim() && gt5rChunkByte(image, base) !== 0xff) {
+            gt5rFillChunkRange(image, base, base + CHANNEL_SIZE, 0xff);
+            gt5rFillChunkRange(image, CHANNEL_MEMORY_NAMES_START + channel * CHANNEL_MEMORY_NAME_SIZE,
+              CHANNEL_MEMORY_NAMES_START + (channel + 1) * CHANNEL_MEMORY_NAME_SIZE);
+            continue;
+          }
+          if (gt5rChunkByte(image, base) === 0xff) continue;
+          throw new Error(`Channel ${channel} needs a receive frequency before it can be written.`);
+        }
+
+        gt5rWriteChunkRange(image, base, gt5rEncodeLbcd4(frequency, `Channel ${channel} RX frequency`));
+        const txText = gt5rControlValue(`channel-${channel}-txFrequency`).trim();
+        const txFrequency = txText ? Number(txText) : Number(frequency);
+        if (txFrequency === 166666665) gt5rFillChunkRange(image, base + 4, base + 8, 0xff);
+        else gt5rWriteChunkRange(image, base + 4, gt5rEncodeLbcd4(txFrequency, `Channel ${channel} TX frequency`));
+
+        for (const [field, offset] of [['rxToneValue', 8], ['txToneValue', 10]]) {
+          const value = gt5rControlValue(`channel-${channel}-${field}`);
+          const tone = value === '' ? 0 : gt5rInteger(value, 0, 0xffff, `Channel ${channel} ${field}`);
+          gt5rSetChunkByte(image, base + offset, tone & 0xff);
+          gt5rSetChunkByte(image, base + offset + 1, tone >> 8);
+        }
+
+        const power = gt5rControlValue(`channel-${channel}-lowpower`) === '1' ? 1 : 0;
+        gt5rSetChunkByte(image, base + 14, (gt5rChunkByte(image, base + 14) & 0xfc) | power);
+        const wide = gt5rControlValue(`channel-${channel}-wide`) === '1';
+        const scan = gt5rControlValue(`channel-${channel}-scan`) === '1';
+        gt5rSetChunkByte(image, base + 15, (gt5rChunkByte(image, base + 15) & ~0x44) |
+          (wide ? 0x40 : 0) | (scan ? 0x04 : 0));
+
+        if (name.length > CHANNEL_MEMORY_NAME_REAL_SIZE || !validChar.test(name)) {
+          throw new Error(`Channel ${channel} name must be at most 7 supported characters.`);
+        }
+        const nameOffset = CHANNEL_MEMORY_NAMES_START + channel * CHANNEL_MEMORY_NAME_SIZE;
+        gt5rFillChunkRange(image, nameOffset, nameOffset + CHANNEL_MEMORY_NAME_SIZE, 0xff);
+        gt5rWriteChunkRange(image, nameOffset, Array.from(name, (char) => char.charCodeAt(0)));
+      }
+
+      const skippedSettings = new Set([1, 2, 5, 10, 11, 12, 13, 15, 17, 25, 26, 27, 28]);
+      for (let index = 0; index < 32; index += 1) {
+        if (skippedSettings.has(index) || !gt5rNameChanged(`settings-${index}`)) continue;
+        const value = gt5rInteger(gt5rControlValue(`settings-${index}`), 0, 0xff,
+          `Menu setting ${index}`);
+        const address = SETTINGS_START + 0x20 + index;
+        if (index === 18) gt5rSetChunkByte(image, address, (gt5rChunkByte(image, address) & 0xfc) | (value & 0x03));
+        else gt5rSetChunkByte(image, address, value);
+      }
+
+      for (let index = 32; index <= 40; index += 1) {
+        if (index === 33 || index === 40 || !gt5rNameChanged(`settings-${index}`)) continue;
+        gt5rSetChunkByte(image, SETTINGS_START + CHUNK_SIZE + index - 32, gt5rInteger(
+          gt5rControlValue(`settings-${index}`), 0, 0xff, `Menu setting ${index}`));
+      }
+
+      const packedFlags = [
+        ['settings-42-displayab', 0x80], ['settings-42-fmradio', 0x10],
+        ['settings-42-unknown', 0x04], ['settings-42-reset', 0x02],
+        ['settings-42-menu', 0x01],
+      ];
+      const settings42Address = SETTINGS_START + CHUNK_SIZE + 10;
+      for (const [name, mask] of packedFlags) {
+        if (!gt5rNameChanged(name)) continue;
+        const value = Number(gt5rControlValue(name));
+        gt5rSetChunkByte(image, settings42Address,
+          value ? gt5rChunkByte(image, settings42Address) | mask :
+            gt5rChunkByte(image, settings42Address) & ~mask);
+      }
+      for (const [name, address] of [
+        ['settings-44-workmode', SETTINGS_START + CHUNK_SIZE + 12],
+        ['settings-45-keylock', SETTINGS_START + CHUNK_SIZE + 13],
+      ]) {
+        if (!gt5rNameChanged(name)) continue;
+        const value = Number(gt5rControlValue(name));
+        gt5rSetChunkByte(image, address,
+          value ? gt5rChunkByte(image, address) | 0x01 : gt5rChunkByte(image, address) & 0xfe);
+      }
+
+      for (const vfo of ['a', 'b']) {
+        const base = VFO_MEMORY_START + 8 + (vfo === 'b' ? 32 : 0);
+        const frequencyName = `vfo-${vfo}-frequency`;
+        if (gt5rNameChanged(frequencyName)) {
+          gt5rWriteChunkRange(image, base, gt5rEncodeDigits(gt5rControlValue(frequencyName), 8,
+            `VFO ${vfo.toUpperCase()} frequency`));
+        }
+        const offsetName = `vfo-${vfo}-offset`;
+        if (gt5rNameChanged(offsetName)) {
+          const offset = Number(gt5rControlValue(offsetName));
+          if (!Number.isFinite(offset) || offset < 0 || offset > 999.999) {
+            throw new Error(`VFO ${vfo.toUpperCase()} offset must be between 0 and 999.999 MHz.`);
+          }
+          gt5rWriteChunkRange(image, base + 8, gt5rEncodeDigits(String(Math.round(offset * 1000)), 6,
+            `VFO ${vfo.toUpperCase()} offset`));
+        }
+        for (const [field, byteOffset] of [['rxtone', 14], ['txtone', 16]]) {
+          const name = `vfo-${vfo}-${field}`;
+          if (!gt5rNameChanged(name)) continue;
+          const value = gt5rInteger(gt5rControlValue(name) || '0', 0, 0xffff,
+            `VFO ${vfo.toUpperCase()} ${field}`);
+          gt5rSetChunkByte(image, base + byteOffset, value & 0xff);
+          gt5rSetChunkByte(image, base + byteOffset + 1, value >> 8);
+        }
+        const bandName = `vfo-${vfo}-band`;
+        if (gt5rNameChanged(bandName)) {
+          gt5rSetChunkByte(image, base + 18, (gt5rChunkByte(image, base + 18) & 0xfe) |
+            Number(gt5rControlValue(bandName)));
+        }
+        const shiftName = `vfo-${vfo}-sftd`;
+        const codeName = `vfo-${vfo}-scode`;
+        if (gt5rNameChanged(shiftName) || gt5rNameChanged(codeName)) {
+          const shift = gt5rInteger(gt5rControlValue(shiftName) || '0', 0, 2,
+            `VFO ${vfo.toUpperCase()} shift`);
+          const code = gt5rInteger(gt5rControlValue(codeName) || '0', 0, 15,
+            `VFO ${vfo.toUpperCase()} PTT-ID code`);
+          gt5rSetChunkByte(image, base + 20,
+            (gt5rChunkByte(image, base + 20) & 0xc0) | (shift << 4) | code);
+        }
+        const stepName = `vfo-${vfo}-step`;
+        if (gt5rNameChanged(stepName)) {
+          const step = gt5rInteger(gt5rControlValue(stepName), 0, 7,
+            `VFO ${vfo.toUpperCase()} tuning step`);
+          gt5rSetChunkByte(image, base + 22, (gt5rChunkByte(image, base + 22) & 0x8f) | (step << 4));
+        }
+        const powerName = `vfo-${vfo}-txpower`;
+        const widthName = `vfo-${vfo}-widenarr`;
+        if (gt5rNameChanged(powerName) || gt5rNameChanged(widthName)) {
+          const power = Number(gt5rControlValue(powerName));
+          const wide = Number(gt5rControlValue(widthName));
+          gt5rSetChunkByte(image, base + 23,
+            (gt5rChunkByte(image, base + 23) & 0x3f) | (power << 7) | (wide << 6));
+        }
+      }
+
+      for (let index = 1; index <= 15; index += 1) {
+        const name = `settings-pttid-${index}`;
+        if (!gt5rNameChanged(name)) continue;
+        gt5rWriteChunkRange(image, PTTID_START + (index - 1) * 16,
+          gt5rEncodeDtmf(gt5rControlValue(name), 5, `PTT-ID ${index}`));
+      }
+      for (const [name, address, length, label] of [
+        ['settings-alarm-code', ANI_START + 10, 3, 'Alarm code'],
+        ['settings-15', ANI_START + 42, 5, 'ANI code'],
+      ]) {
+        if (gt5rNameChanged(name)) {
+          gt5rWriteChunkRange(image, address, gt5rEncodeDtmf(gt5rControlValue(name), length, label));
+        }
+      }
+      if (gt5rNameChanged('settings-ani-id')) {
+        const address = ANI_START + 47;
+        gt5rSetChunkByte(image, address, (gt5rChunkByte(image, address) & 0xfc) |
+          gt5rInteger(gt5rControlValue('settings-ani-id'), 0, 3, 'ANI ID'));
+      }
+      for (const [name, address] of [
+        ['settings-dtmf-on', ANI_START + 50], ['settings-dtmf-off', ANI_START + 51],
+      ]) {
+        if (gt5rNameChanged(name)) {
+          gt5rSetChunkByte(image, address, gt5rInteger(gt5rControlValue(name), 0, 0xff, name));
+        }
+      }
+
+      for (const [name, offset] of [
+        ['settings-poweron-message-c', 32], ['settings-poweron-message-d', 40],
+      ]) {
+        if (gt5rNameChanged(name)) {
+          gt5rWriteChunkRange(image, GT5R_POWERON_MESSAGE_START + offset,
+            gt5rEncodeText(gt5rControlValue(name), 7, name));
+        }
+      }
+
+      for (const [name, address] of [
+        ['settings-VHF-squelch-0', SQUELCH_VHF_START + 32],
+        ...Array.from({ length: 9 }, (_, index) =>
+          [`settings-VHF-squelch-${index + 1}`, SQUELCH_VHF_START + 33 + index]),
+        ...Array.from({ length: 10 }, (_, index) =>
+          [`settings-UHF-squelch-${index}`, SQUELCH_UHF_START + index]),
+      ]) {
+        if (gt5rNameChanged(name)) {
+          gt5rSetChunkByte(image, address, gt5rInteger(gt5rControlValue(name), 0, 0xff, name));
+        }
+      }
+
+      const limitFields = [
+        ['settings-VHF-Limit-Enabled', 0x1fc0, 0],
+        ['settings-VHF-Limit-Lower', 0x1fc1, 2],
+        ['settings-VHF-Limit-Upper', 0x1fc3, 2],
+        ['settings-UHF-Limit-Enabled', 0x1fc5, 0],
+        ['settings-UHF-Limit-Lower', 0x1fc6, 2],
+        ['settings-UHF-Limit-Upper', 0x1fc8, 2],
+      ];
+      for (const [name, address, length] of limitFields) {
+        if (!gt5rNameChanged(name)) continue;
+        if (length === 0) {
+          gt5rSetChunkByte(image, address, (gt5rChunkByte(image, address) & 0xfe) |
+            Number(gt5rControlValue(name)));
+        } else {
+          gt5rWriteChunkRange(image, address, gt5rEncodeBcd2(gt5rControlValue(name), name));
+        }
+      }
+
+      return { chunks: image, original };
+    }
+
+    function gt5rGetWritableBlocks(original, imageChunks) {
+      const writable = (address) =>
+        address < 0x0cf0 || (address >= 0x0d00 && address < 0x0df0) ||
+        (address >= 0x0e00 && address < 0x1800) ||
+        [0x1ee0, 0x1f60, 0x1f80, 0x1fc0].includes(address);
+
+      // Write all the "settings" memory ranges to ensure they stick.
+      // Writing individual changes seems buggy.
+      const settingsRanges = [
+        [0x0b00, 0x0bf0], [0x0c80, 0x0cc0],
+        [0x0e20, 0x0e50], [0x0e70, 0x0e80],
+        [0x0f00, 0x0f50], [0x1ee0, 0x1ef0],
+        [0x1f60, 0x1f70], [0x1f80, 0x1f90], [0x1fc0, 0x1fd0],
+      ];
+      const inSettingsRange = (address) => settingsRanges.some(
+        ([start, end]) => address >= start && address < end);
+      const blocks = [];
+      for (let chunkIndex = 0; chunkIndex < original.length; chunkIndex += 1) {
+        for (let blockOffset = 0; blockOffset < CHUNK_SIZE; blockOffset += 0x10) {
+          const address = chunkIndex * CHUNK_SIZE + blockOffset;
+          let changed = false;
+          for (let byteOffset = 0; byteOffset < 0x10; byteOffset += 1) {
+            if (original[chunkIndex][blockOffset + byteOffset] !==
+                imageChunks[chunkIndex][blockOffset + byteOffset]) {
+              changed = true;
+              break;
+            }
+          }
+          if (!changed) continue;
+          if (!writable(address)) {
+            throw new Error(`Refusing to write unsupported memory block 0x${address.toString(16)}.`);
+          }
+          blocks.push(address);
+        }
+      }
+      if (blocks.some(inSettingsRange)) {
+        for (const [start, end] of settingsRanges) {
+          for (let address = start; address < end; address += 0x10) {
+            if (!blocks.includes(address)) blocks.push(address);
+          }
+        }
+        blocks.sort((first, second) => first - second);
+      }
+      return blocks;
+    }
+
+    async function gt5rWriteBlock(byteReader, address, data) {
+      if (address % 0x10 !== 0 || data.length !== 0x10) {
+        throw new Error('GT-5R writes must be aligned 16-byte blocks.');
+      }
+      await byteReader.writeBytes([
+        0x58, (address >> 8) & 0xff, address & 0xff, data.length, ...data,
+      ]);
+      await sleep(50);
+      const ack = await byteReader.readBytes(1, 2000);
+      if (ack[0] !== RESPONSE_SUCCESS) {
+        throw new Error(`Radio refused write to block 0x${address.toString(16)}.`);
+      }
     }
 
     /**
