@@ -39,6 +39,7 @@
      // the python code artificially puts the id at the beginning during gt5rIdent which we don't do here
     const CHANNEL_MEMORY_START = 0x0000;
     const CHANNEL_MEMORY_DATA_END = 0x0800; //only 128 channels
+    const GT5R_DTMF_CHARSET = '0123456789ABCD*#';
     const PTTID_START = 0x0B00;// PTTID is 16bits at 0xb00 (0x0b08-0x8), repeated 15 times up to half of 0x0BC0
     const ANI_START = 0x0C80;// ani is 5 bytes? at 0x0cb2 within this struct(0x0C88-0x8), currently set to "80808" on the device
     const SETTINGS_START = 0x0E00; /// start of the settings memory block settings are split between 2 chunks
@@ -2321,7 +2322,7 @@ I guess just let the error happen.*/
               const pttidIndexInChunk = i*CHUNK_SIZE/4;
               const pttidSubarray = chunk.slice(pttidIndexInChunk, pttidIndexInChunk+5);
               const settingName = "settings-pttid-" + (i+1 + chunkIndex*4);
-              const settingValue = pttidSubarray.join('');
+              const settingValue = gt5rDecodeDtmf(pttidSubarray, GT5R_DTMF_CHARSET);
               //console.log(settingName, settingValue);
               setControlValue(settingName, settingValue);
             }
@@ -2525,6 +2526,13 @@ I guess just let the error happen.*/
       await byteReader.writeBytes([RESPONSE_SUCCESS]);
       // await sleep(50);
       return chunk;
+    }
+
+    function gt5rDecodeDtmf(bytes) {
+      return Array.from(bytes)
+        .filter((code) => code < GT5R_DTMF_CHARSET.length)
+        .map((code) => GT5R_DTMF_CHARSET[code])
+        .join('');
     }
 
     /**
